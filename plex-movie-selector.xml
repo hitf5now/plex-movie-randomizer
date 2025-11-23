@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>plex-movie-selector</Name>
-  <Repository>https://github.com/yourusername/plex-movie-selector.git</Repository>
-  <Registry>https://github.com/yourusername/plex-movie-selector</Registry>
+  <Repository>https://github.com/hitf5now/plex-movie-randomizer.git</Repository>
+  <Registry>https://github.com/hitf5now/plex-movie-randomizer</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/yourusername/plex-movie-selector/issues</Support>
-  <Project>https://github.com/yourusername/plex-movie-selector</Project>
+  <Support>https://github.com/hitf5now/plex-movie-randomizer/issues</Support>
+  <Project>https://github.com/hitf5now/plex-movie-randomizer</Project>
   <Overview>A web-based application that helps you select a random movie to watch from your Plex server library with intelligent filtering and rating-based recommendations.
 
 Features:
@@ -21,8 +21,8 @@ Features:
 After installation, access at http://YOUR-SERVER-IP:5000 and login with your Plex credentials.</Overview>
   <Category>MediaApp:Video MediaServer:Video Tools:</Category>
   <WebUI>http://[IP]:[PORT:5000]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/yourusername/plex-movie-selector/main/plex-movie-selector.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/yourusername/plex-movie-selector/main/icon.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/hitf5now/plex-movie-randomizer/main/plex-movie-selector.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/hitf5now/plex-movie-randomizer/main/icon.png</Icon>
   <ExtraParams>--build-arg BUILDKIT_INLINE_CACHE=1</ExtraParams>
   <PostArgs/>
   <CPUset/>
