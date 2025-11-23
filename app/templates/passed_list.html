@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Passed Movies - Plex Movie Selector{% endblock %}
+
+{% block content %}
+<div class="passed-list-container">
+    <h2>Passed Movies</h2>
+    <p class="subtitle">Manage movies you've passed on. These will be excluded from recommendations until they expire (6 months).</p>
+
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading passed movies...</p>
+    </div>
+
+    <div id="passed-movies-list" class="passed-movies-list">
+        <!-- Movies will be loaded here -->
+    </div>
+
+    <div id="no-movies" class="no-movies" style="display: none;">
+        <p>No passed movies found. All movies are available for recommendations!</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadPassedMovies);
+
+async function loadPassedMovies() {
+    const loadingDiv = document.getElementById('loading');
+    const listDiv = document.getElementById('passed-movies-list');
+    const noMoviesDiv = document.getElementById('no-movies');
+
+    loadingDiv.style.display = 'block';
+    listDiv.innerHTML = '';
+    noMoviesDiv.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/passed-movies');
+        const data = await response.json();
+
+        loadingDiv.style.display = 'none';
+
+        if (data.success && data.movies.length > 0) {
+            displayPassedMovies(data.movies);
+        } else {
+            noMoviesDiv.style.display = 'block';
+        }
+    } catch (error) {
+        loadingDiv.style.display = 'none';
+        alert('An error occurred while loading passed movies.');
+    }
+}
+
+function displayPassedMovies(movies) {
+    const listDiv = document.getElementById('passed-movies-list');
+
+    movies.forEach(movie => {
+        const movieDiv = document.createElement('div');
+        movieDiv.className = 'passed-movie-item';
+
+        const passedDate = new Date(movie.passed_at);
+        const expiresDate = new Date(movie.expires_at);
+        const isExpired = movie.is_expired;
+
+        movieDiv.innerHTML = `
+            <div class="movie-info">
+                <h3>${movie.title}</h3>
+                <div class="movie-dates">
+                    <span>Passed: ${passedDate.toLocaleDateString()}</span>
+                    <span>Expires: ${expiresDate.toLocaleDateString()}</span>
+                    ${isExpired ? '<span class="badge expired">Expired</span>' : '<span class="badge active">Active</span>'}
+                </div>
+            </div>
+            <button class="btn btn-danger btn-small" onclick="removePassedMovie(${movie.id})">Remove</button>
+        `;
+
+        listDiv.appendChild(movieDiv);
+    });
+}
+
+async function removePassedMovie(movieId) {
+    if (!confirm('Are you sure you want to remove this movie from the passed list?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/passed-movies/${movieId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadPassedMovies(); // Reload the list
+        } else {
+            alert('Failed to remove movie: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+    }
+}
+</script>
+{% endblock %}

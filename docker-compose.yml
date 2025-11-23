@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  movie-selector:
+    build: .
+    container_name: plex-movie-selector
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+      - PLEX_SERVER_URL=${PLEX_SERVER_URL:-http://host.docker.internal:32400}
+      - DATABASE_URI=sqlite:///instance/movie_selector.db
+      - HOST=0.0.0.0
+      - PORT=5000
+      - DEBUG=False
+    volumes:
+      # Persist database
+      - ./instance:/app/instance
+    restart: unless-stopped
+    networks:
+      - plex-network
+
+networks:
+  plex-network:
+    driver: bridge
