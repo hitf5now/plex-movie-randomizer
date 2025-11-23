@@ -5,6 +5,7 @@ from app.models import User, PassedMovie, UserPreference
 from app.plex_api import PlexAPI
 from app.movie_selector import MovieSelector
 from datetime import datetime
+import os
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -34,10 +35,21 @@ def register_routes(app):
         if not username or not password:
             return jsonify({'error': 'Username and password required'}), 400
 
-        # Authenticate with Plex
-        token = PlexAPI.authenticate(username, password)
-        if not token:
-            return jsonify({'error': 'Invalid credentials'}), 401
+        # Check if PLEX_TOKEN is set in environment (Unraid UI configuration)
+        env_token = os.environ.get('PLEX_TOKEN', '').strip()
+
+        if env_token:
+            # Use environment token for authentication
+            token = env_token
+            # Verify the token works by testing connection
+            plex = PlexAPI(token)
+            if not plex.server:
+                return jsonify({'error': 'Invalid Plex token in configuration'}), 401
+        else:
+            # Authenticate with Plex using username/password
+            token = PlexAPI.authenticate(username, password)
+            if not token:
+                return jsonify({'error': 'Invalid credentials'}), 401
 
         # Check if user exists
         user = User.query.filter_by(plex_username=username).first()

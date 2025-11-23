@@ -25,6 +25,13 @@ A web-based application that helps you select a random movie to watch from your 
 
 ## Installation & Setup
 
+**📚 Detailed Installation Guides:**
+- **[INSTALLATION.md](INSTALLATION.md)** - Complete guide for installing all requirements (Python, Docker, Git)
+- **[DOCKER_INSTALL.md](DOCKER_INSTALL.md)** - Detailed Docker installation for Windows, macOS, and Linux
+- **[UNRAID_UI_INSTALL.md](UNRAID_UI_INSTALL.md)** - ⭐ **Unraid Docker UI installation (no SSH required)**
+- **[GITHUB_SETUP.md](GITHUB_SETUP.md)** - How to upload this project to GitHub
+- **[SETUP_FOR_UNRAID.md](SETUP_FOR_UNRAID.md)** - Preparing your repository for Unraid UI installation
+
 ### Option 1: Docker (Recommended)
 
 1. **Clone or download this repository**
