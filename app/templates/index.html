@@ -197,6 +197,13 @@ async function loadLastWatched() {
         if (data.success && data.movie) {
             lastWatchedMovie = data.movie;
             displayLastWatched(data.movie);
+
+            // Re-apply the current mode now that lastWatchedMovie is loaded
+            const currentMode = document.getElementById('mode_linked').checked ? 'linked' : 'search';
+            switchMode(currentMode);
+
+            // Update linked info display with the loaded data
+            updateLinkedInfoDisplay();
         }
     } catch (error) {
         console.error('Error loading last watched:', error);
