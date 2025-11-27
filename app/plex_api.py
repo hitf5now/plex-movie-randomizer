@@ -192,28 +192,32 @@ class PlexAPI:
             except Exception as e:
                 print(f"Method 1 failed: {e}")
 
-            # Method 2: Try server-proxied playback command
-            print(f"Method 2: Trying server-proxied playback command...")
+            # Method 2: Try server-proxied playback command with headers
+            print(f"Method 2: Trying server-proxied playback command with client headers...")
 
             try:
                 from plexapi.playqueue import PlayQueue
                 pq = PlayQueue.create(self.server, movie)
                 print(f"  PlayQueue created with ID: {pq.playQueueID}")
 
-                # Send command through server to target client
+                # Send command through server with X-Plex-Target-Client-Identifier header
                 params = {
                     'type': 'video',
                     'providerIdentifier': 'com.plexapp.plugins.library',
                     'containerKey': f'/playQueues/{pq.playQueueID}',
                     'key': movie.key,
-                    'offset': 0,
-                    'machineIdentifier': selected_client_identifier,
-                    'commandID': 1
+                    'offset': '0',
+                    'commandID': '1'
+                }
+
+                # Add target client header
+                headers = {
+                    'X-Plex-Target-Client-Identifier': selected_client_identifier
                 }
 
                 play_url = '/player/playback/playMedia'
-                result = self.server.query(play_url, method=self.server._session.post, params=params)
-                print(f"  ✓ Server-proxied command sent successfully")
+                result = self.server.query(play_url, method=self.server._session.post, params=params, headers=headers)
+                print(f"  ✓ Server-proxied command sent successfully with headers")
 
                 return {
                     'success': True,
@@ -224,6 +228,43 @@ class PlexAPI:
 
             except Exception as e:
                 print(f"Method 2 failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+            # Method 3: Try using server.client() to get client object
+            print(f"Method 3: Trying to get client from server.client()...")
+
+            try:
+                # Get all available clients
+                clients = self.server.clients()
+                print(f"  Found {len(clients)} active client(s)")
+
+                # Try to find our target client
+                target_client = None
+                for client in clients:
+                    if hasattr(client, 'machineIdentifier') and client.machineIdentifier == selected_client_identifier:
+                        target_client = client
+                        break
+
+                if target_client:
+                    print(f"  Found client in server.clients(): {target_client.title}")
+                    from plexapi.playqueue import PlayQueue
+                    pq = PlayQueue.create(self.server, movie)
+                    print(f"  PlayQueue created with ID: {pq.playQueueID}")
+                    target_client.playMedia(pq)
+                    print(f"  ✓ SUCCESS! Playback via server.client() and PlayQueue")
+
+                    return {
+                        'success': True,
+                        'error': None,
+                        'deep_link': deep_link,
+                        'method': 'server_client'
+                    }
+                else:
+                    print(f"  Client not found in server.clients()")
+
+            except Exception as e:
+                print(f"Method 3 failed: {e}")
                 import traceback
                 traceback.print_exc()
 
