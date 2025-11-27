@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>plex-movie-selector</Name>
-  <Repository>https://github.com/hitf5now/plex-movie-randomizer.git</Repository>
-  <Registry>https://github.com/hitf5now/plex-movie-randomizer</Registry>
+  <Repository>mestopgoboom/plex-movie-selector:latest</Repository>
+  <Registry>https://hub.docker.com/r/mestopgoboom/plex-movie-selector</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>bash</Shell>
@@ -23,7 +23,7 @@ After installation, access at http://YOUR-SERVER-IP:5000 and login with your Ple
   <WebUI>http://[IP]:[PORT:5000]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/hitf5now/plex-movie-randomizer/main/plex-movie-selector.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/hitf5now/plex-movie-randomizer/main/icon.png</Icon>
-  <ExtraParams>--build-arg BUILDKIT_INLINE_CACHE=1</ExtraParams>
+  <ExtraParams/>
   <PostArgs/>
   <CPUset/>
   <DateInstalled></DateInstalled>
@@ -31,11 +31,11 @@ After installation, access at http://YOUR-SERVER-IP:5000 and login with your Ple
   <DonateLink/>
   <Requires/>
   <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">5000</Config>
-  <Config Name="App Data" Target="/app/instance" Default="/mnt/user/appdata/plex-movie-selector/instance" Mode="rw" Description="Database and application data storage" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/plex-movie-selector/instance</Config>
+  <Config Name="AppData" Target="/app/instance" Default="/mnt/user/appdata/plex-movie-selector/instance" Mode="rw" Description="Database and application data storage" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/plex-movie-selector/instance</Config>
   <Config Name="Plex Server URL" Target="PLEX_SERVER_URL" Default="http://172.17.0.1:32400" Mode="" Description="Plex server URL. Use http://172.17.0.1:32400 if Plex is on the same Unraid server. Use http://YOUR_PLEX_IP:32400 if Plex is on a different machine." Type="Variable" Display="always" Required="true" Mask="false">http://172.17.0.1:32400</Config>
   <Config Name="Plex Token (Optional)" Target="PLEX_TOKEN" Default="" Mode="" Description="Optional: Your Plex authentication token. Get it from https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ - Leave empty to use username/password login." Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Secret Key" Target="SECRET_KEY" Default="" Mode="" Description="Secret key for session security. Leave empty to auto-generate. For production, set a random 32+ character string." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
-  <Config Name="Database URI" Target="DATABASE_URI" Default="sqlite:///instance/movie_selector.db" Mode="" Description="Database connection string. Default SQLite is recommended." Type="Variable" Display="advanced" Required="false" Mask="false">sqlite:///instance/movie_selector.db</Config>
+  <Config Name="Database URI" Target="DATABASE_URI" Default="sqlite:////app/instance/movie_selector.db" Mode="" Description="Database connection string. Default SQLite is recommended." Type="Variable" Display="advanced" Required="false" Mask="false">sqlite:////app/instance/movie_selector.db</Config>
   <Config Name="Debug Mode" Target="DEBUG" Default="False" Mode="" Description="Enable debug mode (True/False). Only enable for troubleshooting." Type="Variable" Display="advanced" Required="false" Mask="false">False</Config>
   <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID for file permissions" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
   <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID for file permissions" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>

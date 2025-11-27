@@ -54,5 +54,9 @@ class UserPreference(db.Model):
     filter_decade = db.Column(db.String(10), nullable=True)  # e.g., "1990s", "2000s"
     filter_actor = db.Column(db.String(100), nullable=True)
 
+    # Playback client preferences
+    selected_client_name = db.Column(db.String(255), nullable=True)  # e.g., "SHIELD Android TV"
+    selected_client_identifier = db.Column(db.String(255), nullable=True)  # Machine identifier for verification
+
     def __repr__(self):
         return f'<UserPreference for user_id {self.user_id}>'

@@ -22,17 +22,17 @@ class MovieSelector:
 
         # Filter 1: Exclude watched movies
         if self.preferences and self.preferences.exclude_watched:
-            filtered_movies = [m for m in filtered_movies if not m.isWatched]
+            filtered_movies = [m for m in filtered_movies if not getattr(m, 'isWatched', False)]
 
         # Get passed movie rating keys
         passed_keys = self._get_passed_movie_keys()
-        filtered_movies = [m for m in filtered_movies if m.ratingKey not in passed_keys]
+        filtered_movies = [m for m in filtered_movies if str(m.ratingKey) not in passed_keys]
 
-        # Filter 2: Exclude movies with same actors as last watched
+        # Filter 2: Include only movies with same actors as last watched
         if self.preferences and self.preferences.exclude_same_actors:
             filtered_movies = self._filter_by_actors(filtered_movies)
 
-        # Filter 3: Exclude movies from same director as last watched
+        # Filter 3: Include only movies from same director as last watched
         if self.preferences and self.preferences.exclude_same_director:
             filtered_movies = self._filter_by_director(filtered_movies)
 
@@ -49,11 +49,11 @@ class MovieSelector:
     def _get_passed_movie_keys(self):
         """Get list of rating keys for movies that are currently passed (not expired)"""
         passed_movies = PassedMovie.query.filter_by(user_id=self.user.id).all()
-        # Only include non-expired passes
-        return [pm.plex_rating_key for pm in passed_movies if not pm.is_expired]
+        # Only include non-expired passes - store as strings for comparison
+        return set([str(pm.plex_rating_key) for pm in passed_movies if not pm.is_expired])
 
     def _filter_by_actors(self, movies):
-        """Filter out movies with actors from the last watched movie"""
+        """Filter to only include movies with actors from the last watched movie"""
         last_watched = self.plex.get_last_watched_movie(self.user.plex_username)
         if not last_watched:
             return movies
@@ -65,14 +65,14 @@ class MovieSelector:
         filtered = []
         for movie in movies:
             movie_actors = set(self.plex.get_movie_actors(movie))
-            # Exclude if there's any overlap in actors
-            if not movie_actors.intersection(last_actors):
+            # Include if there's any overlap in actors
+            if movie_actors.intersection(last_actors):
                 filtered.append(movie)
 
         return filtered
 
     def _filter_by_director(self, movies):
-        """Filter out movies from the same director as last watched movie"""
+        """Filter to only include movies from the same director as last watched movie"""
         last_watched = self.plex.get_last_watched_movie(self.user.plex_username)
         if not last_watched:
             return movies
@@ -84,8 +84,8 @@ class MovieSelector:
         filtered = []
         for movie in movies:
             movie_directors = set(self.plex.get_movie_directors(movie))
-            # Exclude if there's any overlap in directors
-            if not movie_directors.intersection(last_directors):
+            # Include if there's any overlap in directors
+            if movie_directors.intersection(last_directors):
                 filtered.append(movie)
 
         return filtered

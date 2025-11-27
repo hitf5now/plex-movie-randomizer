@@ -1,4 +1,6 @@
-# Use Python 3.11 slim image
+# Unraid-optimized Dockerfile - FIXED VERSION
+# Builds directly from GitHub repository through Unraid Docker UI
+
 FROM python:3.11-slim
 
 # Set working directory
@@ -6,27 +8,78 @@ WORKDIR /app
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
-# Create instance directory for SQLite database
-RUN mkdir -p instance
+# Create instance directory with VERY open permissions (fix for Unraid)
+RUN mkdir -p /app/instance && \
+    chmod 777 /app/instance && \
+    chown -R nobody:nogroup /app/instance 2>/dev/null || true
+
+# Create a startup script that handles environment setup
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "=== Plex Movie Selector Startup ==="
+echo "Running as user: $(whoami) (UID: $(id -u), GID: $(id -g))"
+
+# Ensure instance directory exists with very permissive permissions
+mkdir -p /app/instance
+chmod -R 777 /app/instance
+
+# Set defaults if not provided
+export SECRET_KEY="${SECRET_KEY:-$(python -c 'import secrets; print(secrets.token_hex(32))')}"
+export PLEX_SERVER_URL="${PLEX_SERVER_URL:-http://172.17.0.1:32400}"
+export DATABASE_URI="${DATABASE_URI:-sqlite:////app/instance/movie_selector.db}"
+export HOST="${HOST:-0.0.0.0}"
+export PORT="${PORT:-5000}"
+export DEBUG="${DEBUG:-False}"
+
+echo "Configuration:"
+echo "  Plex Server: $PLEX_SERVER_URL"
+echo "  Database: $DATABASE_URI"
+echo "  Port: $PORT"
+echo ""
+echo "Instance directory info:"
+ls -la /app/instance/ || echo "Directory listing failed"
+echo ""
+echo "Attempting to create test file:"
+touch /app/instance/test.txt && echo "SUCCESS: Can write to /app/instance" || echo "FAILED: Cannot write to /app/instance"
+rm -f /app/instance/test.txt
+echo ""
+echo "Starting application..."
+
+# Start the application
+exec python run.py
+EOF
+
+RUN chmod +x /app/start.sh
 
 # Expose port
 EXPOSE 5000
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/ || exit 1
+
 # Run the application
-CMD ["python", "run.py"]
+CMD ["/app/start.sh"]

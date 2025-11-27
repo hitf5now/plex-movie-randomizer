@@ -127,13 +127,25 @@ def register_routes(app):
             return jsonify({'error': 'rating_key required'}), 400
 
         try:
+            # Get selected client from user preferences
+            selected_client_name = None
+            selected_client_identifier = None
+
+            if current_user.preferences:
+                selected_client_name = current_user.preferences.selected_client_name
+                selected_client_identifier = current_user.preferences.selected_client_identifier
+
             plex = PlexAPI(current_user.plex_token)
-            success = plex.play_movie(rating_key)
+            success, error_message = plex.play_movie(
+                rating_key,
+                selected_client_name=selected_client_name,
+                selected_client_identifier=selected_client_identifier
+            )
 
             if success:
                 return jsonify({'success': True})
             else:
-                return jsonify({'error': 'Failed to play movie'}), 500
+                return jsonify({'error': error_message or 'Failed to play movie'}), 500
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -150,10 +162,10 @@ def register_routes(app):
             return jsonify({'error': 'rating_key required'}), 400
 
         try:
-            # Check if already passed
+            # Check if already passed (convert rating_key to string for consistency)
             existing = PassedMovie.query.filter_by(
                 user_id=current_user.id,
-                plex_rating_key=rating_key
+                plex_rating_key=str(rating_key)
             ).first()
 
             if existing:
@@ -165,7 +177,7 @@ def register_routes(app):
                 # Create new pass entry
                 passed_movie = PassedMovie(
                     user_id=current_user.id,
-                    plex_rating_key=rating_key,
+                    plex_rating_key=str(rating_key),
                     movie_title=title
                 )
                 db.session.add(passed_movie)
@@ -284,3 +296,99 @@ def register_routes(app):
     def passed_list():
         """Passed movies management page"""
         return render_template('passed_list.html')
+
+    @app.route('/clients')
+    @login_required
+    def clients():
+        """Plex clients debug page"""
+        return render_template('clients.html')
+
+    @app.route('/api/last-watched', methods=['GET'])
+    @login_required
+    def api_get_last_watched():
+        """Get the last watched movie information"""
+        try:
+            plex = PlexAPI(current_user.plex_token)
+            last_watched = plex.get_last_watched_movie(current_user.plex_username)
+
+            if not last_watched:
+                return jsonify({'success': True, 'movie': None})
+
+            # Get movie details
+            movie_info = {
+                'title': last_watched.title,
+                'year': plex.get_movie_year(last_watched),
+                'poster': last_watched.thumbUrl if hasattr(last_watched, 'thumbUrl') else '',
+                'actors': plex.get_movie_actors(last_watched)[:5],
+                'directors': plex.get_movie_directors(last_watched)
+            }
+
+            return jsonify({'success': True, 'movie': movie_info})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/clients', methods=['GET'])
+    @login_required
+    def api_get_clients():
+        """Get list of available Plex clients"""
+        try:
+            plex = PlexAPI(current_user.plex_token)
+            clients = plex.get_available_clients()
+
+            return jsonify({
+                'success': True,
+                'clients': clients,
+                'count': len(clients)
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/selected-client', methods=['GET'])
+    @login_required
+    def api_get_selected_client():
+        """Get the currently selected playback client"""
+        try:
+            prefs = current_user.preferences
+            if not prefs or not prefs.selected_client_name:
+                return jsonify({'success': True, 'client': None})
+
+            return jsonify({
+                'success': True,
+                'client': {
+                    'name': prefs.selected_client_name,
+                    'identifier': prefs.selected_client_identifier
+                }
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/selected-client', methods=['POST'])
+    @login_required
+    def api_set_selected_client():
+        """Set the playback client to use"""
+        try:
+            data = request.get_json()
+            client_name = data.get('client_name')
+            client_identifier = data.get('client_identifier')
+
+            if not client_name:
+                return jsonify({'error': 'client_name required'}), 400
+
+            prefs = current_user.preferences
+            if not prefs:
+                prefs = UserPreference(user_id=current_user.id)
+                db.session.add(prefs)
+
+            prefs.selected_client_name = client_name
+            prefs.selected_client_identifier = client_identifier
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'client': {
+                    'name': client_name,
+                    'identifier': client_identifier
+                }
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500

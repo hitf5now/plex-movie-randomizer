@@ -11,14 +11,49 @@
         <div class="container">
             <h1 class="logo">Plex Movie Selector</h1>
             {% if current_user.is_authenticated %}
-            <div class="nav-links">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <div class="nav-links" id="nav-links">
                 <a href="{{ url_for('index') }}">Recommendations</a>
                 <a href="{{ url_for('passed_list') }}">Passed Movies</a>
+                <a href="{{ url_for('clients') }}">Plex Clients</a>
                 <button id="logout-btn" class="btn-link">Logout</button>
             </div>
             {% endif %}
         </div>
     </nav>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const navLinks = document.getElementById('nav-links');
+
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', () => {
+                navLinks.classList.toggle('active');
+                mobileMenuToggle.classList.toggle('active');
+            });
+
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.navbar')) {
+                    navLinks.classList.remove('active');
+                    mobileMenuToggle.classList.remove('active');
+                }
+            });
+
+            // Close menu when a link is clicked
+            navLinks.querySelectorAll('a, button').forEach(link => {
+                link.addEventListener('click', () => {
+                    navLinks.classList.remove('active');
+                    mobileMenuToggle.classList.remove('active');
+                });
+            });
+        }
+    </script>
 
     <main class="container">
         {% block content %}{% endblock %}

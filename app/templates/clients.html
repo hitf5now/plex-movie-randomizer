@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Plex Clients - Plex Movie Selector{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="clients-page">
+        <h1>Plex Clients</h1>
+        <p class="subtitle">View and debug available Plex clients for playback</p>
+
+        <div class="clients-info-card">
+            <div class="client-selection-section">
+                <h2>Select Playback Client</h2>
+                <p class="subtitle-small">Choose which device to use for movie playback</p>
+
+                <div class="client-selector-row">
+                    <div class="form-group">
+                        <label for="client-selector">Playback Device:</label>
+                        <select id="client-selector" class="client-dropdown">
+                            <option value="">-- Select a client --</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="save-client-btn">Save Selection</button>
+                </div>
+
+                <div id="current-selection" class="current-selection" style="display: none;">
+                    <strong>Currently Selected:</strong> <span id="selected-client-name"></span>
+                </div>
+            </div>
+
+            <div class="clients-header">
+                <h2>Available Plex Clients <span id="client-count" class="client-count"></span></h2>
+                <button type="button" class="btn btn-secondary" id="refresh-clients-btn">Refresh Clients</button>
+            </div>
+
+            <div id="clients-list" class="clients-list">
+                <p class="loading-clients">Loading clients...</p>
+            </div>
+        </div>
+
+        <div class="clients-help-section">
+            <h3>About Plex Clients</h3>
+            <p>This page shows all Plex clients detected by the server. Clients are found using three methods:</p>
+
+            <div class="help-methods">
+                <div class="help-method">
+                    <h4>🟢 Active</h4>
+                    <p>Clients with remote control enabled (server.clients()). These are ready for immediate playback.</p>
+                </div>
+                <div class="help-method">
+                    <h4>🔵 Playing</h4>
+                    <p>Clients currently streaming content (sessions()). Can be controlled while active.</p>
+                </div>
+                <div class="help-method">
+                    <h4>⚪ Registered</h4>
+                    <p>Devices registered to your account (account.devices()). May need to be activated for playback.</p>
+                </div>
+            </div>
+
+            <div class="troubleshooting">
+                <h4>Troubleshooting</h4>
+                <ul>
+                    <li>If no clients appear, make sure Plex is open and signed in on a device</li>
+                    <li>Enable "Advertise as player" in Plex client settings for best results</li>
+                    <li>Try playing something briefly on a device, then refresh this page</li>
+                    <li>Check Docker logs for detailed information: <code>docker logs plex-movie-selector -f</code></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let availableClients = [];
+
+// Load clients and selected client on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadPlexClients();
+    await loadSelectedClient();
+});
+
+async function loadPlexClients() {
+    try {
+        const response = await fetch('/api/clients');
+        const data = await response.json();
+
+        if (data.success) {
+            availableClients = data.clients;
+            displayClients(data.clients, data.count);
+            populateClientDropdown(data.clients);
+        } else {
+            displayClientsError('Failed to load clients');
+        }
+    } catch (error) {
+        console.error('Error loading Plex clients:', error);
+        displayClientsError('Error loading clients');
+    }
+}
+
+async function loadSelectedClient() {
+    try {
+        const response = await fetch('/api/selected-client');
+        const data = await response.json();
+
+        if (data.success && data.client) {
+            showCurrentSelection(data.client.name);
+            // Set dropdown to selected value
+            const dropdown = document.getElementById('client-selector');
+            dropdown.value = data.client.identifier;
+        }
+    } catch (error) {
+        console.error('Error loading selected client:', error);
+    }
+}
+
+function populateClientDropdown(clients) {
+    const dropdown = document.getElementById('client-selector');
+
+    // Clear existing options except the first one
+    dropdown.innerHTML = '<option value="">-- Select a client --</option>';
+
+    // Filter out web players (browsers)
+    const webPlayers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'plex web'];
+    const validClients = clients.filter(client => {
+        const title = client.title.toLowerCase();
+        return !webPlayers.some(wp => title.includes(wp));
+    });
+
+    // Add client options
+    validClients.forEach(client => {
+        const option = document.createElement('option');
+        option.value = client.machineIdentifier;
+        option.textContent = `${client.title} (${client.product})`;
+        option.dataset.clientName = client.title;
+        dropdown.appendChild(option);
+    });
+}
+
+async function saveSelectedClient() {
+    const dropdown = document.getElementById('client-selector');
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+
+    if (!dropdown.value) {
+        alert('Please select a client first');
+        return;
+    }
+
+    const clientName = selectedOption.dataset.clientName;
+    const clientIdentifier = dropdown.value;
+
+    try {
+        const response = await fetch('/api/selected-client', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                client_name: clientName,
+                client_identifier: clientIdentifier
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showCurrentSelection(clientName);
+            alert(`Playback client set to: ${clientName}`);
+        } else {
+            alert('Failed to save client selection: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error saving client selection:', error);
+        alert('An error occurred while saving client selection');
+    }
+}
+
+function showCurrentSelection(clientName) {
+    const currentSelection = document.getElementById('current-selection');
+    const selectedClientName = document.getElementById('selected-client-name');
+    selectedClientName.textContent = clientName;
+    currentSelection.style.display = 'block';
+}
+
+function displayClients(clients, count) {
+    const clientsList = document.getElementById('clients-list');
+    const clientCount = document.getElementById('client-count');
+
+    clientCount.textContent = `(${count})`;
+
+    if (count === 0) {
+        clientsList.innerHTML = `
+            <div class="no-clients-message">
+                <p class="no-clients">⚠️ No Plex clients detected</p>
+                <p class="client-help">
+                    <strong>What to do:</strong><br>
+                    1. Make sure Plex is open on a device<br>
+                    2. The device must be signed in to your account<br>
+                    3. Try playing something briefly, then pause it<br>
+                    4. Click "Refresh Clients" above<br>
+                    5. Check the troubleshooting section below for more help
+                </p>
+            </div>
+        `;
+        clientCount.style.color = 'var(--error-color)';
+    } else {
+        let html = '<div class="client-grid">';
+        clients.forEach(client => {
+            const sourceLabel = client.source === 'server.clients()' ? 'Active' :
+                               client.source === 'sessions()' ? 'Playing' : 'Registered';
+            const sourceClass = client.source === 'server.clients()' ? 'source-active' :
+                               client.source === 'sessions()' ? 'source-playing' : 'source-registered';
+
+            html += `
+                <div class="client-card">
+                    <div class="client-card-header">
+                        <div class="client-name">✓ ${client.title}</div>
+                        <span class="client-source ${sourceClass}">${sourceLabel}</span>
+                    </div>
+                    <div class="client-card-body">
+                        <div class="client-info-row">
+                            <strong>Product:</strong> ${client.product}
+                        </div>
+                        <div class="client-info-row">
+                            <strong>Platform:</strong> ${client.platform}
+                        </div>
+                        ${client.device !== 'Unknown' ? `
+                        <div class="client-info-row">
+                            <strong>Device:</strong> ${client.device}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        clientsList.innerHTML = html;
+        clientCount.style.color = 'var(--success-color)';
+    }
+}
+
+function displayClientsError(message) {
+    const clientsList = document.getElementById('clients-list');
+    const clientCount = document.getElementById('client-count');
+    clientsList.innerHTML = `<p class="clients-error">${message}</p>`;
+    clientCount.textContent = '(?)';
+    clientCount.style.color = 'var(--error-color)';
+}
+
+// Event listeners
+document.getElementById('refresh-clients-btn').addEventListener('click', loadPlexClients);
+document.getElementById('save-client-btn').addEventListener('click', saveSelectedClient);
+</script>
+{% endblock %}

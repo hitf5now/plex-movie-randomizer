@@ -1,0 +1,45 @@
+We have a few adjustments to make to the application.
+
+
+
+1. When a movie is added to the "Pass" list the movie is added to the pass list but the system seems to pull the
+exact same movie up as the next recommendation.  It looks like the pass list is not excluding movies stored in the
+pass list from the recommendations.
+
+
+
+2.  Inside the filter options section the second option is to exclude movies with the same actor as last watched.
+This is the opposite of what I wanted it to be.  It should be:  Movies with actors from the last movie watched.  The
+ goal of this selection is that the recommendation should include at least 1 of the actors that was also in the
+previously watched movie.
+
+
+
+I would also like to show a small movie poster and title somewhere on the screen of the last watched movie.  Then if
+ this is selected I want the recommendation to show the actor that is linked to the previous movie.
+
+
+
+Only show this option if the user has a previously watched movie.  Hide the selection until the user has a
+previously watched movie.
+
+
+
+This option should be an exclusive option with the "Filter by Actor" selection.  I would like both of these to be
+grouped together visually.  If the checkbox is checked then the ability to filter by a single actor is hidden and
+any selection populated previously into that field is ignored.
+
+
+
+3.  The same logic and changes for the 2nd item should also apply to the 3rd filter "Exclude Movies from Same
+Director as Last Watched.  This should be "Movies with the same director as the last movie watched".
+
+
+
+4.  The first selection of "Exclude Watched Movies" does not seem to be filtering movies that have been watched
+already.  Lets make sure that the application is filtering movies that have been previously watched by the user.
+
+
+
+5.  Can we make the top menu of recommendations, passed movies, and Logout into a collapsible menu so that the top
+logo has more room on smaller mobile screens?

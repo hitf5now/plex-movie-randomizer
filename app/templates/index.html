@@ -6,25 +6,26 @@
 <div class="recommendation-container">
     <div class="filters-section">
         <h2>Filter Options</h2>
+
+        <!-- Last Watched Movie Display -->
+        <div id="last-watched-container" style="display: none;">
+            <div class="last-watched-movie">
+                <h3>Last Watched</h3>
+                <div class="last-watched-content">
+                    <img id="last-watched-poster" src="" alt="Last Watched" class="last-watched-poster">
+                    <div class="last-watched-info">
+                        <div id="last-watched-title" class="last-watched-title"></div>
+                        <div id="last-watched-year" class="last-watched-year"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <form id="filters-form">
             <div class="filter-group">
                 <label>
                     <input type="checkbox" id="exclude_watched" checked>
                     Exclude Watched Movies
-                </label>
-            </div>
-
-            <div class="filter-group">
-                <label>
-                    <input type="checkbox" id="exclude_same_actors">
-                    Exclude Movies with Same Actors as Last Watched
-                </label>
-            </div>
-
-            <div class="filter-group">
-                <label>
-                    <input type="checkbox" id="exclude_same_director">
-                    Exclude Movies from Same Director as Last Watched
                 </label>
             </div>
 
@@ -43,12 +44,42 @@
                 </select>
             </div>
 
-            <div class="filter-group">
-                <label for="filter_actor">Filter by Actor</label>
-                <input type="text" id="filter_actor" placeholder="Enter actor name">
+            <!-- Actor Filters Group (only shown when last watched is available) -->
+            <div id="actor-filters-group" style="display: none;">
+                <div class="filter-section-header">Actor Filters</div>
+
+                <div class="filter-group">
+                    <label>
+                        <input type="checkbox" id="exclude_same_actors">
+                        Movies with Actors from Last Watched
+                    </label>
+                    <div id="linked-actors-display" class="linked-info" style="display: none;">
+                        <small>Linked actors: <span id="linked-actors-list"></span></small>
+                    </div>
+                </div>
+
+                <div class="filter-divider">OR</div>
+
+                <div class="filter-group" id="specific-actor-group">
+                    <label for="filter_actor">Filter by Specific Actor</label>
+                    <input type="text" id="filter_actor" placeholder="Enter actor name">
+                </div>
             </div>
 
-            <button type="button" id="apply-filters-btn" class="btn btn-secondary">Apply Filters</button>
+            <!-- Director Filter (only shown when last watched is available) -->
+            <div id="director-filter-group" style="display: none;">
+                <div class="filter-section-header">Director Filter</div>
+
+                <div class="filter-group">
+                    <label>
+                        <input type="checkbox" id="exclude_same_director">
+                        Movies with Director from Last Watched
+                    </label>
+                    <div id="linked-directors-display" class="linked-info" style="display: none;">
+                        <small>Linked directors: <span id="linked-directors-list"></span></small>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 
@@ -99,10 +130,16 @@
 {% block scripts %}
 <script>
 let currentMovie = null;
+let lastWatchedMovie = null;
+let selectedClient = null;
 
-// Load preferences on page load
+// Load preferences and last watched on page load
 document.addEventListener('DOMContentLoaded', async () => {
     await loadPreferences();
+    await loadLastWatched();
+    await loadSelectedClient();
+    setupFilterListeners();
+    updatePlayButtonState();
 });
 
 async function loadPreferences() {
@@ -117,9 +154,130 @@ async function loadPreferences() {
             document.getElementById('exclude_same_director').checked = prefs.exclude_same_director;
             document.getElementById('filter_decade').value = prefs.filter_decade || '';
             document.getElementById('filter_actor').value = prefs.filter_actor || '';
+
+            // Update linked actors/directors display
+            updateLinkedInfoDisplay();
         }
     } catch (error) {
         console.error('Error loading preferences:', error);
+    }
+}
+
+async function loadLastWatched() {
+    try {
+        const response = await fetch('/api/last-watched');
+        const data = await response.json();
+
+        if (data.success && data.movie) {
+            lastWatchedMovie = data.movie;
+            displayLastWatched(data.movie);
+            // Show actor and director filter groups
+            document.getElementById('actor-filters-group').style.display = 'block';
+            document.getElementById('director-filter-group').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error loading last watched:', error);
+    }
+}
+
+async function loadSelectedClient() {
+    try {
+        const response = await fetch('/api/selected-client');
+        const data = await response.json();
+
+        if (data.success && data.client) {
+            selectedClient = data.client;
+        } else {
+            selectedClient = null;
+        }
+    } catch (error) {
+        console.error('Error loading selected client:', error);
+        selectedClient = null;
+    }
+}
+
+function updatePlayButtonState() {
+    const playButton = document.getElementById('play-btn');
+
+    if (!selectedClient) {
+        // No client selected - grey out and disable
+        playButton.disabled = true;
+        playButton.style.opacity = '0.5';
+        playButton.style.cursor = 'not-allowed';
+        playButton.title = 'Please select a playback client in the Plex Clients page';
+    } else {
+        // Client selected - enable
+        playButton.disabled = false;
+        playButton.style.opacity = '1';
+        playButton.style.cursor = 'pointer';
+        playButton.title = `Play on ${selectedClient.name}`;
+    }
+}
+
+function displayLastWatched(movie) {
+    document.getElementById('last-watched-container').style.display = 'block';
+    document.getElementById('last-watched-title').textContent = movie.title;
+    document.getElementById('last-watched-year').textContent = movie.year || '';
+    if (movie.poster) {
+        document.getElementById('last-watched-poster').src = movie.poster;
+    }
+}
+
+function setupFilterListeners() {
+    // Handle mutual exclusivity between actor filters
+    const actorCheckbox = document.getElementById('exclude_same_actors');
+    const specificActorInput = document.getElementById('filter_actor');
+
+    actorCheckbox.addEventListener('change', () => {
+        if (actorCheckbox.checked) {
+            specificActorInput.value = '';
+            specificActorInput.disabled = true;
+            updateLinkedInfoDisplay();
+        } else {
+            specificActorInput.disabled = false;
+            updateLinkedInfoDisplay();
+        }
+    });
+
+    specificActorInput.addEventListener('input', () => {
+        if (specificActorInput.value.trim()) {
+            actorCheckbox.checked = false;
+            actorCheckbox.disabled = true;
+            updateLinkedInfoDisplay();
+        } else {
+            actorCheckbox.disabled = false;
+        }
+    });
+
+    // Update linked info when director checkbox changes
+    document.getElementById('exclude_same_director').addEventListener('change', updateLinkedInfoDisplay);
+}
+
+function updateLinkedInfoDisplay() {
+    if (!lastWatchedMovie) return;
+
+    // Show/hide linked actors
+    const actorCheckbox = document.getElementById('exclude_same_actors');
+    const linkedActorsDisplay = document.getElementById('linked-actors-display');
+    const linkedActorsList = document.getElementById('linked-actors-list');
+
+    if (actorCheckbox.checked && lastWatchedMovie.actors && lastWatchedMovie.actors.length > 0) {
+        linkedActorsDisplay.style.display = 'block';
+        linkedActorsList.textContent = lastWatchedMovie.actors.join(', ');
+    } else {
+        linkedActorsDisplay.style.display = 'none';
+    }
+
+    // Show/hide linked directors
+    const directorCheckbox = document.getElementById('exclude_same_director');
+    const linkedDirectorsDisplay = document.getElementById('linked-directors-display');
+    const linkedDirectorsList = document.getElementById('linked-directors-list');
+
+    if (directorCheckbox.checked && lastWatchedMovie.directors && lastWatchedMovie.directors.length > 0) {
+        linkedDirectorsDisplay.style.display = 'block';
+        linkedDirectorsList.textContent = lastWatchedMovie.directors.join(', ');
+    } else {
+        linkedDirectorsDisplay.style.display = 'none';
     }
 }
 
@@ -149,6 +307,9 @@ async function getRecommendation() {
     showLoading();
 
     try {
+        // Save current filter preferences before getting recommendation
+        await savePreferences();
+
         const response = await fetch('/api/recommend');
         const data = await response.json();
 
@@ -180,6 +341,9 @@ function displayMovie(movie) {
     if (movie.poster) {
         document.getElementById('movie-poster-img').src = movie.poster;
     }
+
+    // Update play button state based on selected client
+    updatePlayButtonState();
 }
 
 function showLoading() {
@@ -214,10 +378,10 @@ async function playMovie() {
         if (data.success) {
             alert('Movie is now playing on your Plex client!');
         } else {
-            alert('Failed to play movie: ' + (data.error || 'Unknown error'));
+            alert(data.error || 'Failed to play movie. Please try again.');
         }
     } catch (error) {
-        alert('An error occurred. Please try again.');
+        alert('An error occurred while trying to play the movie. Please check your connection and try again.');
     }
 }
 
@@ -250,11 +414,6 @@ async function passMovie() {
 }
 
 // Event listeners
-document.getElementById('apply-filters-btn').addEventListener('click', async () => {
-    await savePreferences();
-    alert('Filters applied! Get a new recommendation to see the results.');
-});
-
 document.getElementById('get-recommendation-btn').addEventListener('click', getRecommendation);
 document.getElementById('next-btn').addEventListener('click', getRecommendation);
 document.getElementById('play-btn').addEventListener('click', playMovie);
