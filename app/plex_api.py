@@ -735,6 +735,8 @@ Devices found but not playable: Check Plex client settings."""
     def add_movie_to_watchlist(self, movie_rating_key):
         """Add a movie to the user's Plex Watchlist
 
+        Uses the movie's GUID to find it in Plex's metadata and add to watchlist.
+
         Args:
             movie_rating_key: The rating key of the movie to add
 
@@ -747,26 +749,82 @@ Devices found but not playable: Check Plex client settings."""
         try:
             print(f"\n=== Adding Movie to Watchlist ===")
 
-            # Get the movie
+            # Get the movie from local library
             movie = self.get_movie_details(movie_rating_key)
             if not movie:
                 return False, "Movie not found"
 
             print(f"Movie: {movie.title}")
 
-            # Check if movie is already on watchlist
+            # Get the movie's GUID (e.g., imdb://tt0107290)
+            if not hasattr(movie, 'guids') or not movie.guids:
+                print(f"Movie has no GUID, trying alternative method")
+                # Fallback: Try using the movie object directly
+                try:
+                    movie.addToWatchlist()
+                    print(f"✓ Added '{movie.title}' to Watchlist (direct method)")
+                    return True, f"Added '{movie.title}' to your Watchlist!"
+                except Exception as e:
+                    print(f"Direct method failed: {e}")
+                    return False, f"Could not add '{movie.title}' to Watchlist. This movie may not be available in Plex's metadata."
+
+            # Get primary GUID (usually the first one, often IMDb)
+            primary_guid = movie.guids[0].id if movie.guids else None
+            print(f"Movie GUID: {primary_guid}")
+
+            if not primary_guid:
+                return False, "Could not find movie GUID"
+
+            # Search for the movie in Plex's hub/metadata using the GUID
             try:
-                if movie.onWatchlist():
-                    print(f"Movie already on watchlist")
-                    return True, f"'{movie.title}' is already on your Watchlist"
+                from plexapi.myplex import MyPlexAccount
+                account = MyPlexAccount(token=self.token)
+
+                # Search for the movie in Plex's metadata
+                search_results = account.searchDiscover(movie.title, libtype='movie', limit=10)
+
+                # Find the matching movie by comparing GUIDs or title/year
+                metadata_movie = None
+                for result in search_results:
+                    # Try to match by GUID
+                    if hasattr(result, 'guids'):
+                        for guid in result.guids:
+                            if guid.id == primary_guid:
+                                metadata_movie = result
+                                break
+                    # Fallback: match by title and year
+                    if not metadata_movie and result.title == movie.title:
+                        if hasattr(result, 'year') and hasattr(movie, 'year'):
+                            if result.year == movie.year:
+                                metadata_movie = result
+                                break
+                    if metadata_movie:
+                        break
+
+                if metadata_movie:
+                    print(f"Found movie in Plex metadata: {metadata_movie.title}")
+
+                    # Check if already on watchlist
+                    try:
+                        if metadata_movie.onWatchlist():
+                            print(f"Movie already on watchlist")
+                            return True, f"'{movie.title}' is already on your Watchlist"
+                    except Exception as e:
+                        print(f"Note: Could not check watchlist status: {e}")
+
+                    # Add to watchlist
+                    account.addToWatchlist(metadata_movie)
+                    print(f"✓ Added '{movie.title}' to Watchlist")
+                    return True, f"Added '{movie.title}' to your Watchlist! It will be removed automatically after you watch it."
+                else:
+                    print(f"Could not find movie in Plex metadata")
+                    return False, f"Could not find '{movie.title}' in Plex's metadata. The movie may not be available on Plex."
+
             except Exception as e:
-                print(f"Note: Could not check watchlist status: {e}")
-
-            # Add movie to watchlist
-            movie.addToWatchlist()
-            print(f"✓ Added '{movie.title}' to Watchlist")
-
-            return True, f"Added '{movie.title}' to your Watchlist! It will be removed automatically after you watch it."
+                print(f"Error searching Plex metadata: {e}")
+                import traceback
+                traceback.print_exc()
+                return False, f"Error adding to watchlist: {str(e)}"
 
         except Exception as e:
             error_msg = str(e)
