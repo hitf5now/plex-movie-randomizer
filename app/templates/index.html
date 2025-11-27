@@ -111,12 +111,12 @@
                     <p><strong>Cast:</strong> <span id="movie-actors"></span></p>
                 </div>
                 <div class="movie-actions">
-                    <button id="add-to-playlist-btn" class="btn btn-primary">Add to Playlist</button>
+                    <button id="add-to-watchlist-btn" class="btn btn-primary">Add to Watchlist</button>
                     <button id="pass-btn" class="btn btn-secondary">Pass</button>
                     <button id="next-btn" class="btn btn-secondary">Get Another Recommendation</button>
                 </div>
                 <div class="playlist-info">
-                    <p class="info-text">This movie will be added to your <strong>"Plex Movie Randomizer"</strong> playlist. Access it from any Plex client!</p>
+                    <p class="info-text">This movie will be added to your <strong>Plex Watchlist</strong>. Access it from any Plex client, and it will be removed automatically after you watch it!</p>
                 </div>
             </div>
         </div>
@@ -326,16 +326,16 @@ function showNoRecommendation(message) {
     document.getElementById('movie-card').style.display = 'none';
 }
 
-async function addToPlaylist() {
+async function addToWatchlist() {
     if (!currentMovie) return;
 
-    const addBtn = document.getElementById('add-to-playlist-btn');
+    const addBtn = document.getElementById('add-to-watchlist-btn');
     const originalText = addBtn.textContent;
     addBtn.disabled = true;
     addBtn.textContent = 'Adding...';
 
     try {
-        const response = await fetch('/api/add-to-playlist', {
+        const response = await fetch('/api/add-to-watchlist', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -346,11 +346,11 @@ async function addToPlaylist() {
         const data = await response.json();
 
         if (data.success) {
-            alert(data.message || 'Movie added to playlist!');
+            alert(data.message || 'Movie added to Watchlist!');
             // Get next recommendation automatically
             getRecommendation();
         } else {
-            alert(data.error || 'Failed to add movie to playlist. Please try again.');
+            alert(data.error || 'Failed to add movie to Watchlist. Please try again.');
         }
     } catch (error) {
         alert('An error occurred. Please check your connection and try again.');
@@ -391,7 +391,7 @@ async function passMovie() {
 // Event listeners
 document.getElementById('get-recommendation-btn').addEventListener('click', getRecommendation);
 document.getElementById('next-btn').addEventListener('click', getRecommendation);
-document.getElementById('add-to-playlist-btn').addEventListener('click', addToPlaylist);
+document.getElementById('add-to-watchlist-btn').addEventListener('click', addToWatchlist);
 document.getElementById('pass-btn').addEventListener('click', passMovie);
 </script>
 {% endblock %}

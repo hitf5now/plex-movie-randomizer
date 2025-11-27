@@ -116,10 +116,10 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/add-to-playlist', methods=['POST'])
+    @app.route('/api/add-to-watchlist', methods=['POST'])
     @login_required
-    def api_add_to_playlist():
-        """Add a movie to the Plex Movie Randomizer playlist"""
+    def api_add_to_watchlist():
+        """Add a movie to the user's Plex Watchlist"""
         data = request.get_json()
         rating_key = data.get('rating_key')
 
@@ -128,7 +128,7 @@ def register_routes(app):
 
         try:
             plex = PlexAPI(current_user.plex_token)
-            success, message = plex.add_movie_to_playlist(rating_key)
+            success, message = plex.add_movie_to_watchlist(rating_key)
 
             if success:
                 return jsonify({
