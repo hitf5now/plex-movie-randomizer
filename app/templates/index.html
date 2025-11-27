@@ -364,6 +364,11 @@ function showNoRecommendation(message) {
 async function playMovie() {
     if (!currentMovie) return;
 
+    const playBtn = document.getElementById('play-btn');
+    const originalText = playBtn.textContent;
+    playBtn.disabled = true;
+    playBtn.textContent = 'Playing...';
+
     try {
         const response = await fetch('/api/play', {
             method: 'POST',
@@ -376,13 +381,115 @@ async function playMovie() {
         const data = await response.json();
 
         if (data.success) {
-            alert('Movie is now playing on your Plex client!');
+            // Successful playback
+            const methodMsg = data.method === 'playqueue'
+                ? 'Playback started via PlayQueue!'
+                : 'Playback command sent to client!';
+            showPlaybackMessage(methodMsg, 'success', data.deep_link);
         } else {
-            alert(data.error || 'Failed to play movie. Please try again.');
+            // Playback failed - show deep link fallback
+            if (data.deep_link) {
+                showPlaybackMessage(
+                    data.error || 'Could not start playback automatically.',
+                    'fallback',
+                    data.deep_link
+                );
+            } else {
+                alert(data.error || 'Failed to play movie. Please try again.');
+            }
         }
     } catch (error) {
         alert('An error occurred while trying to play the movie. Please check your connection and try again.');
+    } finally {
+        playBtn.disabled = false;
+        playBtn.textContent = originalText;
     }
+}
+
+function showPlaybackMessage(message, type, deepLink) {
+    // Create a modal-style message
+    const existingModal = document.getElementById('playback-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'playback-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 500px;
+        width: 90%;
+    `;
+
+    let content = `
+        <div style="text-align: center;">
+            <p style="font-size: 16px; margin-bottom: 20px; color: #333;">
+                ${message}
+            </p>
+    `;
+
+    if (type === 'fallback' && deepLink) {
+        content += `
+            <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+                Click the link below to open this movie in your Plex app:
+            </p>
+            <a href="${deepLink}"
+               style="display: block; padding: 15px 25px; background: #e5a00d; color: white;
+                      text-decoration: none; border-radius: 5px; font-weight: bold; margin-bottom: 15px;"
+               target="_blank">
+                📱 Open in Plex App
+            </a>
+            <p style="font-size: 12px; color: #999; margin-bottom: 15px;">
+                (On mobile, this will open directly in your Plex app)
+            </p>
+        `;
+    } else if (deepLink) {
+        content += `
+            <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                <a href="${deepLink}" style="color: #e5a00d;" target="_blank">
+                    Or click here to open in Plex app manually
+                </a>
+            </p>
+        `;
+    }
+
+    content += `
+            <button onclick="document.getElementById('playback-modal').remove()"
+                    style="padding: 10px 30px; background: #555; color: white; border: none;
+                           border-radius: 5px; cursor: pointer; font-size: 14px;">
+                Close
+            </button>
+        </div>
+    `;
+
+    modal.innerHTML = content;
+    document.body.appendChild(modal);
+
+    // Add backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'playback-backdrop';
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+    `;
+    backdrop.onclick = () => {
+        modal.remove();
+        backdrop.remove();
+    };
+    document.body.appendChild(backdrop);
 }
 
 async function passMovie() {

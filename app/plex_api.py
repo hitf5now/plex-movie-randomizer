@@ -88,8 +88,183 @@ class PlexAPI:
             print(f"Error getting last watched movie: {e}")
             return None
 
+    def play_movie_direct(self, rating_key, selected_client_identifier=None):
+        """Play a movie using direct server-proxied API commands (NEW METHOD)
+
+        This simplified method uses the Plex server to proxy playback commands
+        to clients, which is more reliable than direct client connections.
+        Based on official Plex API documentation and PlayQueue approach.
+
+        Args:
+            rating_key: The Plex rating key for the movie
+            selected_client_identifier: Machine identifier of the target client
+
+        Returns:
+            dict: {
+                'success': bool,
+                'error': str or None,
+                'deep_link': str or None,
+                'method': str
+            }
+        """
+        if not self.server:
+            return {
+                'success': False,
+                'error': 'Not connected to Plex server',
+                'deep_link': None,
+                'method': None
+            }
+
+        try:
+            # Get the movie
+            movie = self.get_movie_details(rating_key)
+            if not movie:
+                return {
+                    'success': False,
+                    'error': 'Movie not found',
+                    'deep_link': None,
+                    'method': None
+                }
+
+            print(f"\n=== Direct API Playback: {movie.title} ===")
+
+            # Generate deep link as universal fallback
+            server_id = self.server.machineIdentifier
+            deep_link = f"plex://play/?key={movie.key}&server={server_id}"
+            print(f"Deep link generated: {deep_link}")
+
+            # If no client selected, return deep link immediately
+            if not selected_client_identifier:
+                return {
+                    'success': False,
+                    'error': 'No client selected. Use the deep link to play on your device.',
+                    'deep_link': deep_link,
+                    'method': 'deep_link'
+                }
+
+            # Method 1: Try PlayQueue with direct client connection
+            print(f"Method 1: Looking for client with ID: {selected_client_identifier}")
+
+            try:
+                # Get all available clients from account
+                from plexapi.myplex import MyPlexAccount
+                account = MyPlexAccount(token=self.token)
+                devices = account.devices()
+
+                # Find the target device
+                target_device = None
+                for device in devices:
+                    if device.clientIdentifier == selected_client_identifier:
+                        target_device = device
+                        break
+
+                if not target_device:
+                    print(f"  Client not found in account devices")
+                else:
+                    print(f"  Found device: {target_device.name} ({target_device.product})")
+
+                    # Try to connect to the device
+                    try:
+                        client = target_device.connect()
+                        if client:
+                            from plexapi.client import PlexClient
+                            if isinstance(client, PlexClient):
+                                print(f"  Connected to client, attempting playback...")
+
+                                # Create PlayQueue on server
+                                from plexapi.playqueue import PlayQueue
+                                pq = PlayQueue.create(self.server, movie)
+                                print(f"  PlayQueue created with ID: {pq.playQueueID}")
+
+                                # Play using PlayQueue
+                                client.playMedia(pq)
+                                print(f"  ✓ SUCCESS! Playback initiated via PlayQueue")
+
+                                return {
+                                    'success': True,
+                                    'error': None,
+                                    'deep_link': deep_link,
+                                    'method': 'playqueue'
+                                }
+                    except Exception as e:
+                        print(f"  PlayQueue method failed: {e}")
+
+            except Exception as e:
+                print(f"Method 1 failed: {e}")
+
+            # Method 2: Try server-proxied playback command
+            print(f"Method 2: Trying server-proxied playback command...")
+
+            try:
+                from plexapi.playqueue import PlayQueue
+                pq = PlayQueue.create(self.server, movie)
+                print(f"  PlayQueue created with ID: {pq.playQueueID}")
+
+                # Send command through server to target client
+                params = {
+                    'type': 'video',
+                    'providerIdentifier': 'com.plexapp.plugins.library',
+                    'containerKey': f'/playQueues/{pq.playQueueID}',
+                    'key': movie.key,
+                    'offset': 0,
+                    'machineIdentifier': selected_client_identifier,
+                    'commandID': 1
+                }
+
+                play_url = '/player/playback/playMedia'
+                result = self.server.query(play_url, method=self.server._session.post, params=params)
+                print(f"  ✓ Server-proxied command sent successfully")
+
+                return {
+                    'success': True,
+                    'error': None,
+                    'deep_link': deep_link,
+                    'method': 'server_proxy'
+                }
+
+            except Exception as e:
+                print(f"Method 2 failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+            # All automated methods failed - return deep link as fallback
+            print(f"All automated methods failed. Providing deep link fallback.")
+            return {
+                'success': False,
+                'error': 'Could not connect to client automatically. Use the deep link below to play manually.',
+                'deep_link': deep_link,
+                'method': 'deep_link'
+            }
+
+        except Exception as e:
+            print(f"Error in play_movie_direct: {e}")
+            import traceback
+            traceback.print_exc()
+
+            # Try to generate deep link even on error
+            try:
+                movie = self.get_movie_details(rating_key)
+                if movie:
+                    server_id = self.server.machineIdentifier
+                    deep_link = f"plex://play/?key={movie.key}&server={server_id}"
+                    return {
+                        'success': False,
+                        'error': str(e),
+                        'deep_link': deep_link,
+                        'method': 'deep_link'
+                    }
+            except:
+                pass
+
+            return {
+                'success': False,
+                'error': str(e),
+                'deep_link': None,
+                'method': None
+            }
+
     def play_movie(self, rating_key, player_name=None, selected_client_name=None, selected_client_identifier=None):
-        """Play a movie on the specified player or default player
+        """Play a movie on the specified player or default player (LEGACY METHOD)
 
         This method tries multiple approaches:
         1. If selected_client specified - Only try that specific client

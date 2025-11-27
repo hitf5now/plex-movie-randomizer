@@ -119,7 +119,7 @@ def register_routes(app):
     @app.route('/api/play', methods=['POST'])
     @login_required
     def api_play():
-        """Play a movie"""
+        """Play a movie using new direct API method"""
         data = request.get_json()
         rating_key = data.get('rating_key')
 
@@ -128,24 +128,31 @@ def register_routes(app):
 
         try:
             # Get selected client from user preferences
-            selected_client_name = None
             selected_client_identifier = None
 
             if current_user.preferences:
-                selected_client_name = current_user.preferences.selected_client_name
                 selected_client_identifier = current_user.preferences.selected_client_identifier
 
             plex = PlexAPI(current_user.plex_token)
-            success, error_message = plex.play_movie(
+            result = plex.play_movie_direct(
                 rating_key,
-                selected_client_name=selected_client_name,
                 selected_client_identifier=selected_client_identifier
             )
 
-            if success:
-                return jsonify({'success': True})
+            if result['success']:
+                return jsonify({
+                    'success': True,
+                    'method': result['method'],
+                    'deep_link': result.get('deep_link')
+                })
             else:
-                return jsonify({'error': error_message or 'Failed to play movie'}), 500
+                # Return error with deep link as fallback
+                return jsonify({
+                    'success': False,
+                    'error': result['error'] or 'Failed to play movie',
+                    'deep_link': result.get('deep_link'),
+                    'method': result.get('method')
+                }), 200  # Return 200 even on failure so we can show deep link
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
