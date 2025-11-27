@@ -7,7 +7,21 @@
     <div class="filters-section">
         <h2>Filter Options</h2>
 
-        <!-- Last Watched Movie Display -->
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+            <div class="filter-group">
+                <label class="mode-option">
+                    <input type="radio" name="filter_mode" id="mode_linked" value="linked" checked>
+                    <span>Linked Mode</span>
+                </label>
+                <label class="mode-option">
+                    <input type="radio" name="filter_mode" id="mode_search" value="search">
+                    <span>Search Mode</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Last Watched Movie Display (Linked Mode only) -->
         <div id="last-watched-container" style="display: none;">
             <div class="last-watched-movie">
                 <h3>Last Watched</h3>
@@ -22,6 +36,7 @@
         </div>
 
         <form id="filters-form">
+            <!-- Common Filter: Exclude Watched -->
             <div class="filter-group">
                 <label>
                     <input type="checkbox" id="exclude_watched" checked>
@@ -29,55 +44,51 @@
                 </label>
             </div>
 
-            <div class="filter-group">
-                <label for="filter_decade">Filter by Decade</label>
-                <select id="filter_decade">
-                    <option value="">All Decades</option>
-                    <option value="1950s">1950s</option>
-                    <option value="1960s">1960s</option>
-                    <option value="1970s">1970s</option>
-                    <option value="1980s">1980s</option>
-                    <option value="1990s">1990s</option>
-                    <option value="2000s">2000s</option>
-                    <option value="2010s">2010s</option>
-                    <option value="2020s">2020s</option>
-                </select>
-            </div>
-
-            <!-- Actor Filters Group (only shown when last watched is available) -->
-            <div id="actor-filters-group" style="display: none;">
-                <div class="filter-section-header">Actor Filters</div>
+            <!-- LINKED MODE FILTERS -->
+            <div id="linked-mode-filters" style="display: none;">
+                <div class="filter-section-header">Link By</div>
 
                 <div class="filter-group">
-                    <label>
-                        <input type="checkbox" id="exclude_same_actors">
-                        Movies with Actors from Last Watched
+                    <label class="link-option">
+                        <input type="radio" name="link_type" id="link_actors" value="actors">
+                        <span>Actors from Last Watched</span>
                     </label>
                     <div id="linked-actors-display" class="linked-info" style="display: none;">
-                        <small>Linked actors: <span id="linked-actors-list"></span></small>
+                        <small>Actors: <span id="linked-actors-list"></span></small>
                     </div>
                 </div>
 
-                <div class="filter-divider">OR</div>
-
-                <div class="filter-group" id="specific-actor-group">
-                    <label for="filter_actor">Filter by Specific Actor</label>
-                    <input type="text" id="filter_actor" placeholder="Enter actor name">
+                <div class="filter-group">
+                    <label class="link-option">
+                        <input type="radio" name="link_type" id="link_directors" value="directors">
+                        <span>Directors from Last Watched</span>
+                    </label>
+                    <div id="linked-directors-display" class="linked-info" style="display: none;">
+                        <small>Directors: <span id="linked-directors-list"></span></small>
+                    </div>
                 </div>
             </div>
 
-            <!-- Director Filter (only shown when last watched is available) -->
-            <div id="director-filter-group" style="display: none;">
-                <div class="filter-section-header">Director Filter</div>
+            <!-- SEARCH MODE FILTERS -->
+            <div id="search-mode-filters" style="display: none;">
+                <div class="filter-group">
+                    <label for="filter_decade">Filter by Decade</label>
+                    <select id="filter_decade">
+                        <option value="">All Decades</option>
+                        <option value="1950s">1950s</option>
+                        <option value="1960s">1960s</option>
+                        <option value="1970s">1970s</option>
+                        <option value="1980s">1980s</option>
+                        <option value="1990s">1990s</option>
+                        <option value="2000s">2000s</option>
+                        <option value="2010s">2010s</option>
+                        <option value="2020s">2020s</option>
+                    </select>
+                </div>
 
                 <div class="filter-group">
-                    <label>
-                        <input type="checkbox" id="exclude_same_director">
-                        Movies with Director from Last Watched
-                    </label>
-                    <div id="linked-directors-display" class="linked-info" style="display: none;">
-                        <small>Linked directors: <span id="linked-directors-list"></span></small>
-                    </div>
+                    <label for="filter_actor">Filter by Actor</label>
+                    <input type="text" id="filter_actor" placeholder="Enter actor name">
                 </div>
             </div>
         </form>
@@ -100,6 +111,10 @@
             </div>
             <div class="movie-details">
                 <h2 id="movie-title"></h2>
+                <div id="linked-by-badge" class="linked-by-badge" style="display: none;">
+                    <span class="link-icon">🔗</span>
+                    <span id="linked-by-text"></span>
+                </div>
                 <div class="movie-meta">
                     <span id="movie-year"></span>
                     <span class="separator">•</span>
@@ -116,7 +131,7 @@
                     <button id="next-btn" class="btn btn-secondary">Get Another Recommendation</button>
                 </div>
                 <div class="playlist-info">
-                    <p class="info-text">This movie will be added to your <strong>"Up Next"</strong> playlist. Access it from any Plex client, and watched movies will be removed automatically!</p>
+                    <p class="info-text">This movie will be added to your <strong>"Plex Movie Randomizer"</strong> playlist. Access it from any Plex client, and watched movies will be removed automatically!</p>
                 </div>
             </div>
         </div>
@@ -150,8 +165,19 @@ async function loadPreferences() {
         if (data.success) {
             const prefs = data.preferences;
             document.getElementById('exclude_watched').checked = prefs.exclude_watched;
-            document.getElementById('exclude_same_actors').checked = prefs.exclude_same_actors;
-            document.getElementById('exclude_same_director').checked = prefs.exclude_same_director;
+
+            // Set filter mode (default to 'linked')
+            const mode = prefs.filter_mode || 'linked';
+            document.getElementById('mode_' + mode).checked = true;
+            switchMode(mode);
+
+            // Set link type for linked mode (default to 'actors')
+            const linkType = prefs.link_type || 'actors';
+            if (document.getElementById('link_' + linkType)) {
+                document.getElementById('link_' + linkType).checked = true;
+            }
+
+            // Set search mode filters
             document.getElementById('filter_decade').value = prefs.filter_decade || '';
             document.getElementById('filter_actor').value = prefs.filter_actor || '';
 
@@ -171,18 +197,13 @@ async function loadLastWatched() {
         if (data.success && data.movie) {
             lastWatchedMovie = data.movie;
             displayLastWatched(data.movie);
-            // Show actor and director filter groups
-            document.getElementById('actor-filters-group').style.display = 'block';
-            document.getElementById('director-filter-group').style.display = 'block';
         }
     } catch (error) {
         console.error('Error loading last watched:', error);
     }
 }
 
-
 function displayLastWatched(movie) {
-    document.getElementById('last-watched-container').style.display = 'block';
     document.getElementById('last-watched-title').textContent = movie.title;
     document.getElementById('last-watched-year').textContent = movie.year || '';
     if (movie.poster) {
@@ -190,57 +211,70 @@ function displayLastWatched(movie) {
     }
 }
 
+function switchMode(mode) {
+    // Show/hide last watched based on mode
+    const lastWatchedContainer = document.getElementById('last-watched-container');
+    const linkedModeFilters = document.getElementById('linked-mode-filters');
+    const searchModeFilters = document.getElementById('search-mode-filters');
+
+    if (mode === 'linked') {
+        // Show linked mode elements
+        if (lastWatchedMovie) {
+            lastWatchedContainer.style.display = 'block';
+            linkedModeFilters.style.display = 'block';
+        }
+        searchModeFilters.style.display = 'none';
+    } else {
+        // Show search mode elements
+        lastWatchedContainer.style.display = 'none';
+        linkedModeFilters.style.display = 'none';
+        searchModeFilters.style.display = 'block';
+    }
+
+    updateLinkedInfoDisplay();
+}
+
 function setupFilterListeners() {
-    // Handle mutual exclusivity between actor filters
-    const actorCheckbox = document.getElementById('exclude_same_actors');
-    const specificActorInput = document.getElementById('filter_actor');
-
-    actorCheckbox.addEventListener('change', () => {
-        if (actorCheckbox.checked) {
-            specificActorInput.value = '';
-            specificActorInput.disabled = true;
-            updateLinkedInfoDisplay();
-        } else {
-            specificActorInput.disabled = false;
-            updateLinkedInfoDisplay();
-        }
+    // Mode switching listeners
+    document.getElementById('mode_linked').addEventListener('change', (e) => {
+        if (e.target.checked) switchMode('linked');
+    });
+    document.getElementById('mode_search').addEventListener('change', (e) => {
+        if (e.target.checked) switchMode('search');
     });
 
-    specificActorInput.addEventListener('input', () => {
-        if (specificActorInput.value.trim()) {
-            actorCheckbox.checked = false;
-            actorCheckbox.disabled = true;
-            updateLinkedInfoDisplay();
-        } else {
-            actorCheckbox.disabled = false;
-        }
-    });
+    // Link type listeners (for linked mode)
+    const linkActors = document.getElementById('link_actors');
+    const linkDirectors = document.getElementById('link_directors');
 
-    // Update linked info when director checkbox changes
-    document.getElementById('exclude_same_director').addEventListener('change', updateLinkedInfoDisplay);
+    if (linkActors) {
+        linkActors.addEventListener('change', updateLinkedInfoDisplay);
+    }
+    if (linkDirectors) {
+        linkDirectors.addEventListener('change', updateLinkedInfoDisplay);
+    }
 }
 
 function updateLinkedInfoDisplay() {
     if (!lastWatchedMovie) return;
 
-    // Show/hide linked actors
-    const actorCheckbox = document.getElementById('exclude_same_actors');
     const linkedActorsDisplay = document.getElementById('linked-actors-display');
     const linkedActorsList = document.getElementById('linked-actors-list');
+    const linkedDirectorsDisplay = document.getElementById('linked-directors-display');
+    const linkedDirectorsList = document.getElementById('linked-directors-list');
 
-    if (actorCheckbox.checked && lastWatchedMovie.actors && lastWatchedMovie.actors.length > 0) {
+    // Check if link_actors radio is selected
+    const linkActorsRadio = document.getElementById('link_actors');
+    if (linkActorsRadio && linkActorsRadio.checked && lastWatchedMovie.actors && lastWatchedMovie.actors.length > 0) {
         linkedActorsDisplay.style.display = 'block';
         linkedActorsList.textContent = lastWatchedMovie.actors.join(', ');
     } else {
         linkedActorsDisplay.style.display = 'none';
     }
 
-    // Show/hide linked directors
-    const directorCheckbox = document.getElementById('exclude_same_director');
-    const linkedDirectorsDisplay = document.getElementById('linked-directors-display');
-    const linkedDirectorsList = document.getElementById('linked-directors-list');
-
-    if (directorCheckbox.checked && lastWatchedMovie.directors && lastWatchedMovie.directors.length > 0) {
+    // Check if link_directors radio is selected
+    const linkDirectorsRadio = document.getElementById('link_directors');
+    if (linkDirectorsRadio && linkDirectorsRadio.checked && lastWatchedMovie.directors && lastWatchedMovie.directors.length > 0) {
         linkedDirectorsDisplay.style.display = 'block';
         linkedDirectorsList.textContent = lastWatchedMovie.directors.join(', ');
     } else {
@@ -249,10 +283,22 @@ function updateLinkedInfoDisplay() {
 }
 
 async function savePreferences() {
+    // Get current filter mode
+    const filterMode = document.getElementById('mode_linked').checked ? 'linked' : 'search';
+
+    // Get link type for linked mode
+    let linkType = null;
+    if (filterMode === 'linked') {
+        const linkActorsRadio = document.getElementById('link_actors');
+        const linkDirectorsRadio = document.getElementById('link_directors');
+        if (linkActorsRadio && linkActorsRadio.checked) linkType = 'actors';
+        if (linkDirectorsRadio && linkDirectorsRadio.checked) linkType = 'directors';
+    }
+
     const preferences = {
         exclude_watched: document.getElementById('exclude_watched').checked,
-        exclude_same_actors: document.getElementById('exclude_same_actors').checked,
-        exclude_same_director: document.getElementById('exclude_same_director').checked,
+        filter_mode: filterMode,
+        link_type: linkType,
         filter_decade: document.getElementById('filter_decade').value,
         filter_actor: document.getElementById('filter_actor').value
     };
@@ -303,6 +349,18 @@ function displayMovie(movie) {
     document.getElementById('movie-summary').textContent = movie.summary || 'No summary available';
     document.getElementById('movie-directors').textContent = movie.directors.join(', ') || 'Unknown';
     document.getElementById('movie-actors').textContent = movie.actors.join(', ') || 'Unknown';
+
+    // Show linked_by badge if available (for Linked Mode)
+    const linkedByBadge = document.getElementById('linked-by-badge');
+    const linkedByText = document.getElementById('linked-by-text');
+
+    if (movie.linked_by && movie.linked_by.name) {
+        const typeLabel = movie.linked_by.type === 'actor' ? 'Actor' : 'Director';
+        linkedByText.textContent = `Linked by ${typeLabel}: ${movie.linked_by.name}`;
+        linkedByBadge.style.display = 'block';
+    } else {
+        linkedByBadge.style.display = 'none';
+    }
 
     // Set poster if available
     if (movie.poster) {

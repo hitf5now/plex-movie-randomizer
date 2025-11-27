@@ -49,6 +49,10 @@ class UserPreference(db.Model):
 
     # Filter preferences
     exclude_watched = db.Column(db.Boolean, default=True)
+    filter_mode = db.Column(db.String(20), default='linked')  # 'linked' or 'search'
+    link_type = db.Column(db.String(20), nullable=True)  # 'actors' or 'directors' (for linked mode)
+
+    # Legacy filter fields (kept for backwards compatibility)
     exclude_same_actors = db.Column(db.Boolean, default=False)
     exclude_same_director = db.Column(db.Boolean, default=False)
     filter_decade = db.Column(db.String(10), nullable=True)  # e.g., "1990s", "2000s"

@@ -732,7 +732,7 @@ Devices found but not playable: Check Plex client settings."""
             print(f"Error getting rating: {e}")
             return 0
 
-    def get_or_create_playlist(self, user_preference, initial_movie=None, playlist_name="Up Next"):
+    def get_or_create_playlist(self, user_preference, initial_movie=None, playlist_name="Plex Movie Randomizer"):
         """Get existing playlist by stored ID or create new one
 
         This method checks if a playlist exists by the ID stored in user preferences.
@@ -785,6 +785,14 @@ Devices found but not playable: Check Plex client settings."""
                 items=[initial_movie]
             )
             print(f"✓ Created playlist: {playlist.title} (ID: {playlist.ratingKey})")
+
+            # Set playlist poster to the initial movie's poster
+            try:
+                if hasattr(initial_movie, 'thumbUrl') and initial_movie.thumbUrl:
+                    playlist.uploadPoster(url=initial_movie.thumbUrl)
+                    print(f"✓ Set playlist poster to '{initial_movie.title}' poster")
+            except Exception as e:
+                print(f"Note: Could not set playlist poster: {e}")
 
             # Store the playlist ID in user preferences
             user_preference.playlist_id = str(playlist.ratingKey)
@@ -844,6 +852,14 @@ Devices found but not playable: Check Plex client settings."""
                 # Add the movie to the existing playlist
                 playlist.addItems(movie)
                 print(f"✓ Added '{movie.title}' to playlist '{playlist.title}'")
+
+            # Set playlist poster to the movie's poster
+            try:
+                if hasattr(movie, 'thumbUrl') and movie.thumbUrl:
+                    playlist.uploadPoster(url=movie.thumbUrl)
+                    print(f"✓ Updated playlist poster to '{movie.title}' poster")
+            except Exception as e:
+                print(f"Note: Could not update playlist poster: {e}")
 
             # Auto-cleanup watched movies from playlist
             self.cleanup_watched_movies_from_playlist(user_preference)

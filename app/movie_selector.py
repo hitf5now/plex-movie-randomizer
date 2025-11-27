@@ -17,32 +17,37 @@ class MovieSelector:
         return f"{decade}s"
 
     def filter_movies(self, movies):
-        """Apply all active filters to the movie list"""
+        """Apply all active filters to the movie list based on filter mode"""
         filtered_movies = movies
 
-        # Filter 1: Exclude watched movies
+        # Always: Exclude watched movies (if preference is set)
         if self.preferences and self.preferences.exclude_watched:
             filtered_movies = [m for m in filtered_movies if not getattr(m, 'isWatched', False)]
 
-        # Get passed movie rating keys
+        # Always: Exclude passed movies
         passed_keys = self._get_passed_movie_keys()
         filtered_movies = [m for m in filtered_movies if str(m.ratingKey) not in passed_keys]
 
-        # Filter 2: Include only movies with same actors as last watched
-        if self.preferences and self.preferences.exclude_same_actors:
-            filtered_movies = self._filter_by_actors(filtered_movies)
+        # Apply mode-specific filters
+        if self.preferences:
+            filter_mode = self.preferences.filter_mode or 'linked'
 
-        # Filter 3: Include only movies from same director as last watched
-        if self.preferences and self.preferences.exclude_same_director:
-            filtered_movies = self._filter_by_director(filtered_movies)
+            if filter_mode == 'linked':
+                # LINKED MODE: Filter by actors OR directors from last watched
+                link_type = self.preferences.link_type
 
-        # Filter 4: Filter by decade
-        if self.preferences and self.preferences.filter_decade:
-            filtered_movies = self._filter_by_decade(filtered_movies)
+                if link_type == 'actors':
+                    filtered_movies = self._filter_by_actors(filtered_movies)
+                elif link_type == 'directors':
+                    filtered_movies = self._filter_by_director(filtered_movies)
 
-        # Filter 5: Filter by specific actor
-        if self.preferences and self.preferences.filter_actor:
-            filtered_movies = self._filter_by_specific_actor(filtered_movies)
+            else:
+                # SEARCH MODE: Filter by decade and/or specific actor
+                if self.preferences.filter_decade:
+                    filtered_movies = self._filter_by_decade(filtered_movies)
+
+                if self.preferences.filter_actor:
+                    filtered_movies = self._filter_by_specific_actor(filtered_movies)
 
         return filtered_movies
 
@@ -190,10 +195,57 @@ class MovieSelector:
 
         return selected_movie, None
 
+    def get_linking_person(self, movie):
+        """
+        Determine which actor or director from last watched appears in this movie (for Linked Mode)
+        Returns: dict with 'type' ('actor' or 'director'), 'name', and 'image_url'
+        """
+        if not self.preferences or not self.preferences.filter_mode == 'linked':
+            return None
+
+        last_watched = self.plex.get_last_watched_movie(self.user.plex_username)
+        if not last_watched:
+            return None
+
+        link_type = self.preferences.link_type
+
+        if link_type == 'actors':
+            # Find common actors
+            last_actors = set(self.plex.get_movie_actors(last_watched))
+            movie_actors = set(self.plex.get_movie_actors(movie))
+            common = last_actors.intersection(movie_actors)
+            if common:
+                # Return first common actor
+                actor_name = list(common)[0]
+                return {
+                    'type': 'actor',
+                    'name': actor_name,
+                    'image_url': None  # Plex API doesn't easily expose actor images
+                }
+
+        elif link_type == 'directors':
+            # Find common directors
+            last_directors = set(self.plex.get_movie_directors(last_watched))
+            movie_directors = set(self.plex.get_movie_directors(movie))
+            common = last_directors.intersection(movie_directors)
+            if common:
+                # Return first common director
+                director_name = list(common)[0]
+                return {
+                    'type': 'director',
+                    'name': director_name,
+                    'image_url': None  # Plex API doesn't easily expose director images
+                }
+
+        return None
+
     def get_movie_info(self, movie):
         """Get formatted movie information"""
         if not movie:
             return None
+
+        # Get linking person info if in linked mode
+        linking_person = self.get_linking_person(movie)
 
         return {
             'rating_key': movie.ratingKey,
@@ -205,4 +257,5 @@ class MovieSelector:
             'actors': self.plex.get_movie_actors(movie)[:5],  # Top 5 actors
             'directors': self.plex.get_movie_directors(movie),
             'duration': movie.duration if hasattr(movie, 'duration') else 0,
+            'linked_by': linking_person  # Info about which actor/director created the link
         }

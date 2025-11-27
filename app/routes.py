@@ -253,6 +253,8 @@ def register_routes(app):
                 'success': True,
                 'preferences': {
                     'exclude_watched': prefs.exclude_watched,
+                    'filter_mode': prefs.filter_mode,
+                    'link_type': prefs.link_type,
                     'exclude_same_actors': prefs.exclude_same_actors,
                     'exclude_same_director': prefs.exclude_same_director,
                     'filter_decade': prefs.filter_decade,
@@ -278,6 +280,10 @@ def register_routes(app):
             # Update preferences
             if 'exclude_watched' in data:
                 prefs.exclude_watched = data['exclude_watched']
+            if 'filter_mode' in data:
+                prefs.filter_mode = data['filter_mode']
+            if 'link_type' in data:
+                prefs.link_type = data['link_type'] if data['link_type'] else None
             if 'exclude_same_actors' in data:
                 prefs.exclude_same_actors = data['exclude_same_actors']
             if 'exclude_same_director' in data:

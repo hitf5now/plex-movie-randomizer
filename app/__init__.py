@@ -67,6 +67,22 @@ def migrate_database():
                 conn.commit()
             print("✓ Added playlist_id column")
 
+        # Add filter_mode column if it doesn't exist
+        if 'filter_mode' not in columns:
+            print("Adding filter_mode column to user_preferences...")
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE user_preferences ADD COLUMN filter_mode VARCHAR(20) DEFAULT 'linked'"))
+                conn.commit()
+            print("✓ Added filter_mode column")
+
+        # Add link_type column if it doesn't exist
+        if 'link_type' not in columns:
+            print("Adding link_type column to user_preferences...")
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE user_preferences ADD COLUMN link_type VARCHAR(20)'))
+                conn.commit()
+            print("✓ Added link_type column")
+
         print("Database migration completed successfully")
 
     except Exception as e:
