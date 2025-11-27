@@ -262,17 +262,86 @@ class PlexAPI:
                     }
                 else:
                     print(f"  Client not found in server.clients()")
+                    print(f"  This means the client is not advertising for remote control")
 
             except Exception as e:
                 print(f"Method 3 failed: {e}")
                 import traceback
                 traceback.print_exc()
 
+            # Method 4: Try to find client in active sessions and control via session player
+            print(f"Method 4: Checking active sessions for target client...")
+
+            try:
+                sessions = self.server.sessions()
+                print(f"  Found {len(sessions)} active session(s)")
+
+                for session in sessions:
+                    if session.players:
+                        for player in session.players:
+                            player_id = getattr(player, 'machineIdentifier', None)
+                            if player_id == selected_client_identifier:
+                                print(f"  Found target client in active session: {player.title}")
+                                print(f"  Attempting to get client from session player...")
+
+                                try:
+                                    # Try to get the client by title
+                                    client = self.server.client(player.title)
+                                    if client:
+                                        from plexapi.playqueue import PlayQueue
+                                        pq = PlayQueue.create(self.server, movie)
+                                        print(f"  PlayQueue created with ID: {pq.playQueueID}")
+                                        client.playMedia(pq)
+                                        print(f"  ✓ SUCCESS! Playback via session client and PlayQueue")
+
+                                        return {
+                                            'success': True,
+                                            'error': None,
+                                            'deep_link': deep_link,
+                                            'method': 'session_client'
+                                        }
+                                except Exception as client_err:
+                                    print(f"  Could not control client from session: {client_err}")
+
+                print(f"  Target client not found in any active sessions")
+
+            except Exception as e:
+                print(f"Method 4 failed: {e}")
+                import traceback
+                traceback.print_exc()
+
             # All automated methods failed - return deep link as fallback
-            print(f"All automated methods failed. Providing deep link fallback.")
+            print(f"\nAll automated methods failed.")
+            print(f"This usually means the client is not configured for remote control.")
+            print(f"Providing deep link fallback...\n")
+
+            # Provide specific error message based on device type
+            if target_device and 'Windows' in target_device.product:
+                error_msg = """Could not start playback automatically on Plex for Windows.
+
+To enable remote control:
+1. Open Plex for Windows
+2. Go to Settings → Network
+3. Enable "Advertise as player"
+4. Restart Plex for Windows
+
+Or click the "Open in Plex App" button below to play manually."""
+            elif target_device and 'Android' in target_device.product:
+                error_msg = """Could not start playback automatically.
+
+For best results, try playing something on your device first, then use this app.
+
+Or click the "Open in Plex App" button below to play manually."""
+            else:
+                error_msg = """Could not start playback automatically.
+
+This client may not support remote control via the Plex API.
+
+Click the "Open in Plex App" button below to play manually."""
+
             return {
                 'success': False,
-                'error': 'Could not connect to client automatically. Use the deep link below to play manually.',
+                'error': error_msg,
                 'deep_link': deep_link,
                 'method': 'deep_link'
             }
