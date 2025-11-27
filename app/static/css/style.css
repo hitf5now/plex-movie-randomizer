@@ -1015,8 +1015,9 @@ body {
 .mode-selector {
     margin-bottom: 1.5rem;
     padding: 1rem;
-    background: #f8f9fa;
+    background: var(--surface-color);
     border-radius: 8px;
+    border: 1px solid var(--secondary-color);
 }
 
 .mode-option {
@@ -1025,14 +1026,20 @@ body {
     margin-right: 1.5rem;
     cursor: pointer;
     font-weight: 500;
+    color: var(--text-color);
 }
 
 .mode-option input[type="radio"] {
     margin-right: 0.5rem;
+    accent-color: var(--primary-color);
 }
 
 .mode-option span {
     user-select: none;
+}
+
+.mode-option:hover span {
+    color: var(--primary-color);
 }
 
 /* Link Type Options (for Linked Mode) */
@@ -1042,15 +1049,18 @@ body {
     cursor: pointer;
     padding: 0.5rem;
     border-radius: 4px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
+    color: var(--text-color);
 }
 
 .link-option:hover {
-    background-color: #f8f9fa;
+    background-color: var(--surface-color);
+    color: var(--primary-color);
 }
 
 .link-option input[type="radio"] {
     margin-right: 0.75rem;
+    accent-color: var(--primary-color);
 }
 
 .link-option span {
@@ -1064,13 +1074,13 @@ body {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #b8860b 100%);
+    color: var(--secondary-color);
     border-radius: 20px;
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     margin: 0.5rem 0 1rem 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .linked-by-badge .link-icon {
@@ -1080,23 +1090,23 @@ body {
 /* Filter Section Headers */
 .filter-section-header {
     font-weight: 600;
-    color: #333;
+    color: var(--primary-color);
     margin: 1rem 0 0.75rem 0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #e9ecef;
+    border-bottom: 2px solid var(--surface-color);
 }
 
 /* Linked Info Display */
 .linked-info {
     margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: #e7f3ff;
-    border-left: 3px solid #0066cc;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-color);
+    border-left: 3px solid var(--primary-color);
     border-radius: 4px;
 }
 
 .linked-info small {
-    color: #0066cc;
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
@@ -1105,13 +1115,13 @@ body {
     .mode-selector {
         padding: 0.75rem;
     }
-    
+
     .mode-option {
         display: block;
         margin-bottom: 0.75rem;
         margin-right: 0;
     }
-    
+
     .linked-by-badge {
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem;

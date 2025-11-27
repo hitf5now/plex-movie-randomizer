@@ -808,7 +808,10 @@ Devices found but not playable: Check Plex client settings."""
             return None, False
 
     def add_movie_to_playlist(self, movie_rating_key, user_preference):
-        """Add a movie to the user's playlist
+        """Add a movie to the user's playlist (replaces any existing movies)
+
+        The playlist will only ever contain ONE movie - the most recent recommendation.
+        Any existing movies are cleared before adding the new one.
 
         Args:
             movie_rating_key: The rating key of the movie to add
@@ -839,17 +842,17 @@ Devices found but not playable: Check Plex client settings."""
             if was_created:
                 print(f"✓ Movie added during playlist creation")
             else:
-                # Check if movie is already in playlist
+                # Clear ALL existing movies from the playlist first
                 try:
                     playlist_items = playlist.items()
-                    for item in playlist_items:
-                        if item.ratingKey == movie.ratingKey:
-                            print(f"Movie already in playlist")
-                            return True, f"'{movie.title}' is already in your playlist"
+                    if playlist_items:
+                        print(f"Clearing {len(playlist_items)} existing movie(s) from playlist...")
+                        playlist.removeItems(playlist_items)
+                        print(f"✓ Cleared playlist")
                 except Exception as e:
-                    print(f"Note: Could not check playlist items: {e}")
+                    print(f"Note: Could not clear playlist: {e}")
 
-                # Add the movie to the existing playlist
+                # Add the new movie to the now-empty playlist
                 playlist.addItems(movie)
                 print(f"✓ Added '{movie.title}' to playlist '{playlist.title}'")
 
@@ -860,9 +863,6 @@ Devices found but not playable: Check Plex client settings."""
                     print(f"✓ Updated playlist poster to '{movie.title}' poster")
             except Exception as e:
                 print(f"Note: Could not update playlist poster: {e}")
-
-            # Auto-cleanup watched movies from playlist
-            self.cleanup_watched_movies_from_playlist(user_preference)
 
             return True, f"Added '{movie.title}' to your playlist!"
 
