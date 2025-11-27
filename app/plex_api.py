@@ -732,7 +732,7 @@ Devices found but not playable: Check Plex client settings."""
             print(f"Error getting rating: {e}")
             return 0
 
-    def get_or_create_playlist(self, user_preference, playlist_name="Up Next"):
+    def get_or_create_playlist(self, user_preference, initial_movie=None, playlist_name="Up Next"):
         """Get existing playlist by stored ID or create new one
 
         This method checks if a playlist exists by the ID stored in user preferences.
@@ -741,14 +741,15 @@ Devices found but not playable: Check Plex client settings."""
 
         Args:
             user_preference: UserPreference model instance for the current user
+            initial_movie: Movie object to use when creating a new playlist (required for new playlists)
             playlist_name: Name to use when creating a new playlist (default: "Up Next")
 
         Returns:
-            Playlist object or None if error
+            tuple: (playlist object or None, created: bool indicating if playlist was just created)
         """
         if not self.server:
             print("ERROR: Not connected to Plex server")
-            return None
+            return None, False
 
         try:
             from app import db
@@ -757,7 +758,7 @@ Devices found but not playable: Check Plex client settings."""
             movies_section = self.get_movie_library()
             if not movies_section:
                 print("ERROR: Could not access Movies library")
-                return None
+                return None, False
 
             # Check if user has a stored playlist ID
             if user_preference.playlist_id:
@@ -767,17 +768,21 @@ Devices found but not playable: Check Plex client settings."""
                     playlist = self.server.playlist(user_preference.playlist_id)
                     if playlist:
                         print(f"✓ Found existing playlist: {playlist.title} (ID: {playlist.ratingKey})")
-                        return playlist
+                        return playlist, False
                 except Exception as e:
                     print(f"Stored playlist not found (may have been deleted): {e}")
                     # Will create new playlist below
 
             # Playlist doesn't exist or was deleted - create new one
-            print(f"Creating new playlist: {playlist_name}")
+            if not initial_movie:
+                print("ERROR: Cannot create playlist without initial movie")
+                return None, False
+
+            print(f"Creating new playlist: {playlist_name} with initial movie: {initial_movie.title}")
             playlist = self.server.createPlaylist(
                 title=playlist_name,
                 section=movies_section,
-                items=[]
+                items=[initial_movie]
             )
             print(f"✓ Created playlist: {playlist.title} (ID: {playlist.ratingKey})")
 
@@ -786,13 +791,13 @@ Devices found but not playable: Check Plex client settings."""
             db.session.commit()
             print(f"✓ Saved playlist ID to database: {playlist.ratingKey}")
 
-            return playlist
+            return playlist, True
 
         except Exception as e:
             print(f"Error in get_or_create_playlist: {e}")
             import traceback
             traceback.print_exc()
-            return None
+            return None, False
 
     def add_movie_to_playlist(self, movie_rating_key, user_preference):
         """Add a movie to the user's playlist
@@ -817,24 +822,28 @@ Devices found but not playable: Check Plex client settings."""
 
             print(f"Movie: {movie.title}")
 
-            # Get or create the playlist
-            playlist = self.get_or_create_playlist(user_preference)
+            # Get or create the playlist (pass movie as initial item for new playlists)
+            playlist, was_created = self.get_or_create_playlist(user_preference, initial_movie=movie)
             if not playlist:
                 return False, "Could not access or create playlist"
 
-            # Check if movie is already in playlist
-            try:
-                playlist_items = playlist.items()
-                for item in playlist_items:
-                    if item.ratingKey == movie.ratingKey:
-                        print(f"Movie already in playlist")
-                        return True, f"'{movie.title}' is already in your playlist"
-            except Exception as e:
-                print(f"Note: Could not check playlist items: {e}")
+            # If playlist was just created, the movie is already in it
+            if was_created:
+                print(f"✓ Movie added during playlist creation")
+            else:
+                # Check if movie is already in playlist
+                try:
+                    playlist_items = playlist.items()
+                    for item in playlist_items:
+                        if item.ratingKey == movie.ratingKey:
+                            print(f"Movie already in playlist")
+                            return True, f"'{movie.title}' is already in your playlist"
+                except Exception as e:
+                    print(f"Note: Could not check playlist items: {e}")
 
-            # Add the movie to the playlist
-            playlist.addItems(movie)
-            print(f"✓ Added '{movie.title}' to playlist '{playlist.title}'")
+                # Add the movie to the existing playlist
+                playlist.addItems(movie)
+                print(f"✓ Added '{movie.title}' to playlist '{playlist.title}'")
 
             # Auto-cleanup watched movies from playlist
             self.cleanup_watched_movies_from_playlist(user_preference)
@@ -866,8 +875,8 @@ Devices found but not playable: Check Plex client settings."""
         try:
             print(f"\n=== Cleaning Up Watched Movies from Playlist ===")
 
-            # Get the playlist
-            playlist = self.get_or_create_playlist(user_preference)
+            # Get the playlist (don't create if it doesn't exist - cleanup only for existing playlists)
+            playlist, _ = self.get_or_create_playlist(user_preference)
             if not playlist:
                 print("Could not access playlist for cleanup")
                 return 0
