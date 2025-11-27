@@ -732,13 +732,74 @@ Devices found but not playable: Check Plex client settings."""
             print(f"Error getting rating: {e}")
             return 0
 
-    def add_movie_to_watchlist(self, movie_rating_key):
-        """Add a movie to the user's Plex Watchlist
+    def get_or_create_playlist(self, user_preference, playlist_name="Up Next"):
+        """Get existing playlist by stored ID or create new one
 
-        Uses the movie's GUID to find it in Plex's metadata and add to watchlist.
+        This method checks if a playlist exists by the ID stored in user preferences.
+        If the playlist was deleted or doesn't exist, it creates a new one and updates
+        the stored ID in the database.
+
+        Args:
+            user_preference: UserPreference model instance for the current user
+            playlist_name: Name to use when creating a new playlist (default: "Up Next")
+
+        Returns:
+            Playlist object or None if error
+        """
+        if not self.server:
+            print("ERROR: Not connected to Plex server")
+            return None
+
+        try:
+            from app import db
+
+            # Get the movies library section
+            movies_section = self.get_movie_library()
+            if not movies_section:
+                print("ERROR: Could not access Movies library")
+                return None
+
+            # Check if user has a stored playlist ID
+            if user_preference.playlist_id:
+                print(f"Checking for playlist with ID: {user_preference.playlist_id}")
+                try:
+                    # Try to get the playlist by stored ID
+                    playlist = self.server.playlist(user_preference.playlist_id)
+                    if playlist:
+                        print(f"✓ Found existing playlist: {playlist.title} (ID: {playlist.ratingKey})")
+                        return playlist
+                except Exception as e:
+                    print(f"Stored playlist not found (may have been deleted): {e}")
+                    # Will create new playlist below
+
+            # Playlist doesn't exist or was deleted - create new one
+            print(f"Creating new playlist: {playlist_name}")
+            playlist = self.server.createPlaylist(
+                title=playlist_name,
+                section=movies_section,
+                items=[]
+            )
+            print(f"✓ Created playlist: {playlist.title} (ID: {playlist.ratingKey})")
+
+            # Store the playlist ID in user preferences
+            user_preference.playlist_id = str(playlist.ratingKey)
+            db.session.commit()
+            print(f"✓ Saved playlist ID to database: {playlist.ratingKey}")
+
+            return playlist
+
+        except Exception as e:
+            print(f"Error in get_or_create_playlist: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def add_movie_to_playlist(self, movie_rating_key, user_preference):
+        """Add a movie to the user's playlist
 
         Args:
             movie_rating_key: The rating key of the movie to add
+            user_preference: UserPreference model instance for the current user
 
         Returns:
             tuple: (success: bool, message: str)
@@ -747,7 +808,7 @@ Devices found but not playable: Check Plex client settings."""
             return False, "Not connected to Plex server"
 
         try:
-            print(f"\n=== Adding Movie to Watchlist ===")
+            print(f"\n=== Adding Movie to Playlist ===")
 
             # Get the movie from local library
             movie = self.get_movie_details(movie_rating_key)
@@ -756,82 +817,86 @@ Devices found but not playable: Check Plex client settings."""
 
             print(f"Movie: {movie.title}")
 
-            # Get the movie's GUID (e.g., imdb://tt0107290)
-            if not hasattr(movie, 'guids') or not movie.guids:
-                print(f"Movie has no GUID, trying alternative method")
-                # Fallback: Try using the movie object directly
-                try:
-                    movie.addToWatchlist()
-                    print(f"✓ Added '{movie.title}' to Watchlist (direct method)")
-                    return True, f"Added '{movie.title}' to your Watchlist!"
-                except Exception as e:
-                    print(f"Direct method failed: {e}")
-                    return False, f"Could not add '{movie.title}' to Watchlist. This movie may not be available in Plex's metadata."
+            # Get or create the playlist
+            playlist = self.get_or_create_playlist(user_preference)
+            if not playlist:
+                return False, "Could not access or create playlist"
 
-            # Get primary GUID (usually the first one, often IMDb)
-            primary_guid = movie.guids[0].id if movie.guids else None
-            print(f"Movie GUID: {primary_guid}")
-
-            if not primary_guid:
-                return False, "Could not find movie GUID"
-
-            # Search for the movie in Plex's hub/metadata using the GUID
+            # Check if movie is already in playlist
             try:
-                from plexapi.myplex import MyPlexAccount
-                account = MyPlexAccount(token=self.token)
-
-                # Search for the movie in Plex's metadata
-                search_results = account.searchDiscover(movie.title, libtype='movie', limit=10)
-
-                # Find the matching movie by comparing GUIDs or title/year
-                metadata_movie = None
-                for result in search_results:
-                    # Try to match by GUID
-                    if hasattr(result, 'guids'):
-                        for guid in result.guids:
-                            if guid.id == primary_guid:
-                                metadata_movie = result
-                                break
-                    # Fallback: match by title and year
-                    if not metadata_movie and result.title == movie.title:
-                        if hasattr(result, 'year') and hasattr(movie, 'year'):
-                            if result.year == movie.year:
-                                metadata_movie = result
-                                break
-                    if metadata_movie:
-                        break
-
-                if metadata_movie:
-                    print(f"Found movie in Plex metadata: {metadata_movie.title}")
-
-                    # Check if already on watchlist
-                    try:
-                        if metadata_movie.onWatchlist():
-                            print(f"Movie already on watchlist")
-                            return True, f"'{movie.title}' is already on your Watchlist"
-                    except Exception as e:
-                        print(f"Note: Could not check watchlist status: {e}")
-
-                    # Add to watchlist
-                    account.addToWatchlist(metadata_movie)
-                    print(f"✓ Added '{movie.title}' to Watchlist")
-                    return True, f"Added '{movie.title}' to your Watchlist! It will be removed automatically after you watch it."
-                else:
-                    print(f"Could not find movie in Plex metadata")
-                    return False, f"Could not find '{movie.title}' in Plex's metadata. The movie may not be available on Plex."
-
+                playlist_items = playlist.items()
+                for item in playlist_items:
+                    if item.ratingKey == movie.ratingKey:
+                        print(f"Movie already in playlist")
+                        return True, f"'{movie.title}' is already in your playlist"
             except Exception as e:
-                print(f"Error searching Plex metadata: {e}")
-                import traceback
-                traceback.print_exc()
-                return False, f"Error adding to watchlist: {str(e)}"
+                print(f"Note: Could not check playlist items: {e}")
+
+            # Add the movie to the playlist
+            playlist.addItems(movie)
+            print(f"✓ Added '{movie.title}' to playlist '{playlist.title}'")
+
+            # Auto-cleanup watched movies from playlist
+            self.cleanup_watched_movies_from_playlist(user_preference)
+
+            return True, f"Added '{movie.title}' to your playlist!"
 
         except Exception as e:
             error_msg = str(e)
-            print(f"Error adding movie to watchlist: {error_msg}")
+            print(f"Error adding movie to playlist: {error_msg}")
             import traceback
             traceback.print_exc()
-            return False, f"Error adding movie to watchlist: {error_msg}"
+            return False, f"Error adding movie to playlist: {error_msg}"
+
+    def cleanup_watched_movies_from_playlist(self, user_preference):
+        """Remove watched movies from the user's playlist
+
+        This method checks all items in the playlist and removes any that have been watched.
+
+        Args:
+            user_preference: UserPreference model instance for the current user
+
+        Returns:
+            int: Number of movies removed from playlist
+        """
+        if not self.server:
+            print("ERROR: Not connected to Plex server")
+            return 0
+
+        try:
+            print(f"\n=== Cleaning Up Watched Movies from Playlist ===")
+
+            # Get the playlist
+            playlist = self.get_or_create_playlist(user_preference)
+            if not playlist:
+                print("Could not access playlist for cleanup")
+                return 0
+
+            # Get all items in the playlist
+            playlist_items = playlist.items()
+            print(f"Playlist has {len(playlist_items)} item(s)")
+
+            # Find watched movies
+            watched_items = []
+            for item in playlist_items:
+                if item.isWatched:
+                    watched_items.append(item)
+                    print(f"  Found watched movie: {item.title}")
+
+            # Remove watched movies
+            if watched_items:
+                playlist.removeItems(watched_items)
+                print(f"✓ Removed {len(watched_items)} watched movie(s) from playlist")
+                return len(watched_items)
+            else:
+                print("No watched movies to remove")
+                return 0
+
+        except Exception as e:
+            print(f"Error cleaning up playlist: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0
 
     def get_available_clients(self):
         """Get list of available Plex clients for playback

@@ -59,6 +59,14 @@ def migrate_database():
                 conn.commit()
             print("✓ Added selected_client_identifier column")
 
+        # Add playlist_id column if it doesn't exist
+        if 'playlist_id' not in columns:
+            print("Adding playlist_id column to user_preferences...")
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE user_preferences ADD COLUMN playlist_id VARCHAR(100)'))
+                conn.commit()
+            print("✓ Added playlist_id column")
+
         print("Database migration completed successfully")
 
     except Exception as e:

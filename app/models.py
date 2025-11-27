@@ -54,7 +54,10 @@ class UserPreference(db.Model):
     filter_decade = db.Column(db.String(10), nullable=True)  # e.g., "1990s", "2000s"
     filter_actor = db.Column(db.String(100), nullable=True)
 
-    # Playback client preferences
+    # Playlist preferences
+    playlist_id = db.Column(db.String(100), nullable=True)  # Plex playlist ID for persistent playlist tracking
+
+    # Playback client preferences (legacy - not used in playlist mode)
     selected_client_name = db.Column(db.String(255), nullable=True)  # e.g., "SHIELD Android TV"
     selected_client_identifier = db.Column(db.String(255), nullable=True)  # Machine identifier for verification
 
