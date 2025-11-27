@@ -111,9 +111,12 @@
                     <p><strong>Cast:</strong> <span id="movie-actors"></span></p>
                 </div>
                 <div class="movie-actions">
-                    <button id="play-btn" class="btn btn-primary">Play Movie</button>
+                    <button id="add-to-playlist-btn" class="btn btn-primary">Add to Playlist</button>
                     <button id="pass-btn" class="btn btn-secondary">Pass</button>
                     <button id="next-btn" class="btn btn-secondary">Get Another Recommendation</button>
+                </div>
+                <div class="playlist-info">
+                    <p class="info-text">This movie will be added to your <strong>"Plex Movie Randomizer"</strong> playlist. Access it from any Plex client!</p>
                 </div>
             </div>
         </div>
@@ -131,15 +134,12 @@
 <script>
 let currentMovie = null;
 let lastWatchedMovie = null;
-let selectedClient = null;
 
 // Load preferences and last watched on page load
 document.addEventListener('DOMContentLoaded', async () => {
     await loadPreferences();
     await loadLastWatched();
-    await loadSelectedClient();
     setupFilterListeners();
-    updatePlayButtonState();
 });
 
 async function loadPreferences() {
@@ -180,39 +180,6 @@ async function loadLastWatched() {
     }
 }
 
-async function loadSelectedClient() {
-    try {
-        const response = await fetch('/api/selected-client');
-        const data = await response.json();
-
-        if (data.success && data.client) {
-            selectedClient = data.client;
-        } else {
-            selectedClient = null;
-        }
-    } catch (error) {
-        console.error('Error loading selected client:', error);
-        selectedClient = null;
-    }
-}
-
-function updatePlayButtonState() {
-    const playButton = document.getElementById('play-btn');
-
-    if (!selectedClient) {
-        // No client selected - grey out and disable
-        playButton.disabled = true;
-        playButton.style.opacity = '0.5';
-        playButton.style.cursor = 'not-allowed';
-        playButton.title = 'Please select a playback client in the Plex Clients page';
-    } else {
-        // Client selected - enable
-        playButton.disabled = false;
-        playButton.style.opacity = '1';
-        playButton.style.cursor = 'pointer';
-        playButton.title = `Play on ${selectedClient.name}`;
-    }
-}
 
 function displayLastWatched(movie) {
     document.getElementById('last-watched-container').style.display = 'block';
@@ -342,8 +309,6 @@ function displayMovie(movie) {
         document.getElementById('movie-poster-img').src = movie.poster;
     }
 
-    // Update play button state based on selected client
-    updatePlayButtonState();
 }
 
 function showLoading() {
@@ -361,16 +326,16 @@ function showNoRecommendation(message) {
     document.getElementById('movie-card').style.display = 'none';
 }
 
-async function playMovie() {
+async function addToPlaylist() {
     if (!currentMovie) return;
 
-    const playBtn = document.getElementById('play-btn');
-    const originalText = playBtn.textContent;
-    playBtn.disabled = true;
-    playBtn.textContent = 'Playing...';
+    const addBtn = document.getElementById('add-to-playlist-btn');
+    const originalText = addBtn.textContent;
+    addBtn.disabled = true;
+    addBtn.textContent = 'Adding...';
 
     try {
-        const response = await fetch('/api/play', {
+        const response = await fetch('/api/add-to-playlist', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -381,115 +346,18 @@ async function playMovie() {
         const data = await response.json();
 
         if (data.success) {
-            // Successful playback
-            const methodMsg = data.method === 'playqueue'
-                ? 'Playback started via PlayQueue!'
-                : 'Playback command sent to client!';
-            showPlaybackMessage(methodMsg, 'success', data.deep_link);
+            alert(data.message || 'Movie added to playlist!');
+            // Get next recommendation automatically
+            getRecommendation();
         } else {
-            // Playback failed - show deep link fallback
-            if (data.deep_link) {
-                showPlaybackMessage(
-                    data.error || 'Could not start playback automatically.',
-                    'fallback',
-                    data.deep_link
-                );
-            } else {
-                alert(data.error || 'Failed to play movie. Please try again.');
-            }
+            alert(data.error || 'Failed to add movie to playlist. Please try again.');
         }
     } catch (error) {
-        alert('An error occurred while trying to play the movie. Please check your connection and try again.');
+        alert('An error occurred. Please check your connection and try again.');
     } finally {
-        playBtn.disabled = false;
-        playBtn.textContent = originalText;
+        addBtn.disabled = false;
+        addBtn.textContent = originalText;
     }
-}
-
-function showPlaybackMessage(message, type, deepLink) {
-    // Create a modal-style message
-    const existingModal = document.getElementById('playback-modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
-    const modal = document.createElement('div');
-    modal.id = 'playback-modal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        z-index: 10000;
-        max-width: 500px;
-        width: 90%;
-    `;
-
-    let content = `
-        <div style="text-align: center;">
-            <p style="font-size: 16px; margin-bottom: 20px; color: #333;">
-                ${message}
-            </p>
-    `;
-
-    if (type === 'fallback' && deepLink) {
-        content += `
-            <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
-                Click the link below to open this movie in your Plex app:
-            </p>
-            <a href="${deepLink}"
-               style="display: block; padding: 15px 25px; background: #e5a00d; color: white;
-                      text-decoration: none; border-radius: 5px; font-weight: bold; margin-bottom: 15px;"
-               target="_blank">
-                📱 Open in Plex App
-            </a>
-            <p style="font-size: 12px; color: #999; margin-bottom: 15px;">
-                (On mobile, this will open directly in your Plex app)
-            </p>
-        `;
-    } else if (deepLink) {
-        content += `
-            <p style="margin-top: 10px; font-size: 12px; color: #666;">
-                <a href="${deepLink}" style="color: #e5a00d;" target="_blank">
-                    Or click here to open in Plex app manually
-                </a>
-            </p>
-        `;
-    }
-
-    content += `
-            <button onclick="document.getElementById('playback-modal').remove()"
-                    style="padding: 10px 30px; background: #555; color: white; border: none;
-                           border-radius: 5px; cursor: pointer; font-size: 14px;">
-                Close
-            </button>
-        </div>
-    `;
-
-    modal.innerHTML = content;
-    document.body.appendChild(modal);
-
-    // Add backdrop
-    const backdrop = document.createElement('div');
-    backdrop.id = 'playback-backdrop';
-    backdrop.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-    `;
-    backdrop.onclick = () => {
-        modal.remove();
-        backdrop.remove();
-    };
-    document.body.appendChild(backdrop);
 }
 
 async function passMovie() {
@@ -523,7 +391,7 @@ async function passMovie() {
 // Event listeners
 document.getElementById('get-recommendation-btn').addEventListener('click', getRecommendation);
 document.getElementById('next-btn').addEventListener('click', getRecommendation);
-document.getElementById('play-btn').addEventListener('click', playMovie);
+document.getElementById('add-to-playlist-btn').addEventListener('click', addToPlaylist);
 document.getElementById('pass-btn').addEventListener('click', passMovie);
 </script>
 {% endblock %}

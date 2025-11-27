@@ -732,6 +732,141 @@ Devices found but not playable: Check Plex client settings."""
             print(f"Error getting rating: {e}")
             return 0
 
+    def get_or_create_playlist(self, playlist_name="Plex Movie Randomizer"):
+        """Get existing playlist or create new one
+
+        Args:
+            playlist_name: Name of the playlist to get or create
+
+        Returns:
+            Playlist object or None
+        """
+        if not self.server:
+            print("ERROR: No server connection")
+            return None
+
+        try:
+            print(f"\n=== Managing Playlist: {playlist_name} ===")
+
+            # Try to get existing playlist
+            try:
+                playlists = self.server.playlists()
+                for playlist in playlists:
+                    if playlist.title == playlist_name:
+                        print(f"Found existing playlist: {playlist_name}")
+                        return playlist
+            except Exception as e:
+                print(f"Error searching for existing playlist: {e}")
+
+            # Playlist doesn't exist, create it
+            print(f"Creating new playlist: {playlist_name}")
+            movies_section = self.server.library.section('Movies')
+            playlist = self.server.createPlaylist(
+                title=playlist_name,
+                section=movies_section,
+                items=[]
+            )
+            print(f"✓ Created playlist: {playlist_name}")
+            return playlist
+
+        except Exception as e:
+            print(f"Error managing playlist: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def add_movie_to_playlist(self, movie_rating_key, playlist_name="Plex Movie Randomizer"):
+        """Add a movie to the playlist
+
+        Args:
+            movie_rating_key: The rating key of the movie to add
+            playlist_name: Name of the playlist
+
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        if not self.server:
+            return False, "Not connected to Plex server"
+
+        try:
+            print(f"\n=== Adding Movie to Playlist ===")
+
+            # Get the movie
+            movie = self.get_movie_details(movie_rating_key)
+            if not movie:
+                return False, "Movie not found"
+
+            print(f"Movie: {movie.title}")
+
+            # Get or create the playlist
+            playlist = self.get_or_create_playlist(playlist_name)
+            if not playlist:
+                return False, "Could not access playlist"
+
+            # Check if movie is already in playlist
+            try:
+                playlist_items = playlist.items()
+                for item in playlist_items:
+                    if item.ratingKey == movie.ratingKey:
+                        print(f"Movie already in playlist")
+                        return True, f"'{movie.title}' is already in your playlist"
+            except Exception as e:
+                print(f"Error checking playlist items: {e}")
+
+            # Add movie to playlist
+            playlist.addItems(movie)
+            print(f"✓ Added '{movie.title}' to playlist '{playlist_name}'")
+
+            return True, f"Added '{movie.title}' to your '{playlist_name}' playlist!"
+
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error adding movie to playlist: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return False, f"Error adding movie to playlist: {error_msg}"
+
+    def remove_movie_from_playlist(self, movie_rating_key, playlist_name="Plex Movie Randomizer"):
+        """Remove a movie from the playlist
+
+        Args:
+            movie_rating_key: The rating key of the movie to remove
+            playlist_name: Name of the playlist
+
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        if not self.server:
+            return False, "Not connected to Plex server"
+
+        try:
+            print(f"\n=== Removing Movie from Playlist ===")
+
+            # Get the playlist
+            playlist = self.get_or_create_playlist(playlist_name)
+            if not playlist:
+                return False, "Could not access playlist"
+
+            # Get the movie
+            movie = self.get_movie_details(movie_rating_key)
+            if not movie:
+                return False, "Movie not found"
+
+            print(f"Movie: {movie.title}")
+
+            # Remove movie from playlist
+            playlist.removeItems(movie)
+            print(f"✓ Removed '{movie.title}' from playlist '{playlist_name}'")
+
+            return True, f"Removed '{movie.title}' from playlist"
+
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error removing movie from playlist: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return False, f"Error removing movie from playlist: {error_msg}"
+
     def get_available_clients(self):
         """Get list of available Plex clients for playback
 

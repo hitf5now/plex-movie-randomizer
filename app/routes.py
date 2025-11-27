@@ -116,10 +116,10 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/play', methods=['POST'])
+    @app.route('/api/add-to-playlist', methods=['POST'])
     @login_required
-    def api_play():
-        """Play a movie using new direct API method"""
+    def api_add_to_playlist():
+        """Add a movie to the Plex Movie Randomizer playlist"""
         data = request.get_json()
         rating_key = data.get('rating_key')
 
@@ -127,32 +127,19 @@ def register_routes(app):
             return jsonify({'error': 'rating_key required'}), 400
 
         try:
-            # Get selected client from user preferences
-            selected_client_identifier = None
-
-            if current_user.preferences:
-                selected_client_identifier = current_user.preferences.selected_client_identifier
-
             plex = PlexAPI(current_user.plex_token)
-            result = plex.play_movie_direct(
-                rating_key,
-                selected_client_identifier=selected_client_identifier
-            )
+            success, message = plex.add_movie_to_playlist(rating_key)
 
-            if result['success']:
+            if success:
                 return jsonify({
                     'success': True,
-                    'method': result['method'],
-                    'deep_link': result.get('deep_link')
+                    'message': message
                 })
             else:
-                # Return error with deep link as fallback
                 return jsonify({
                     'success': False,
-                    'error': result['error'] or 'Failed to play movie',
-                    'deep_link': result.get('deep_link'),
-                    'method': result.get('method')
-                }), 200  # Return 200 even on failure so we can show deep link
+                    'error': message
+                }), 500
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -304,11 +291,6 @@ def register_routes(app):
         """Passed movies management page"""
         return render_template('passed_list.html')
 
-    @app.route('/clients')
-    @login_required
-    def clients():
-        """Plex clients debug page"""
-        return render_template('clients.html')
 
     @app.route('/api/last-watched', methods=['GET'])
     @login_required
@@ -334,68 +316,3 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/clients', methods=['GET'])
-    @login_required
-    def api_get_clients():
-        """Get list of available Plex clients"""
-        try:
-            plex = PlexAPI(current_user.plex_token)
-            clients = plex.get_available_clients()
-
-            return jsonify({
-                'success': True,
-                'clients': clients,
-                'count': len(clients)
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/selected-client', methods=['GET'])
-    @login_required
-    def api_get_selected_client():
-        """Get the currently selected playback client"""
-        try:
-            prefs = current_user.preferences
-            if not prefs or not prefs.selected_client_name:
-                return jsonify({'success': True, 'client': None})
-
-            return jsonify({
-                'success': True,
-                'client': {
-                    'name': prefs.selected_client_name,
-                    'identifier': prefs.selected_client_identifier
-                }
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/selected-client', methods=['POST'])
-    @login_required
-    def api_set_selected_client():
-        """Set the playback client to use"""
-        try:
-            data = request.get_json()
-            client_name = data.get('client_name')
-            client_identifier = data.get('client_identifier')
-
-            if not client_name:
-                return jsonify({'error': 'client_name required'}), 400
-
-            prefs = current_user.preferences
-            if not prefs:
-                prefs = UserPreference(user_id=current_user.id)
-                db.session.add(prefs)
-
-            prefs.selected_client_name = client_name
-            prefs.selected_client_identifier = client_identifier
-            db.session.commit()
-
-            return jsonify({
-                'success': True,
-                'client': {
-                    'name': client_name,
-                    'identifier': client_identifier
-                }
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500

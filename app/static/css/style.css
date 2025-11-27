@@ -990,3 +990,19 @@ body {
         font-size: 1.2rem;
     }
 }
+
+/* Playlist Info Styling */
+.playlist-info {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #f0f7ff;
+    border-left: 4px solid #e5a00d;
+    border-radius: 4px;
+}
+
+.playlist-info .info-text {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #444;
+    line-height: 1.5;
+}

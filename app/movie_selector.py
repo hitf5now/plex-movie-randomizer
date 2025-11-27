@@ -149,7 +149,7 @@ class MovieSelector:
         1. Gets all movies
         2. Applies filters
         3. Groups by rating
-        4. Returns random movie from highest rating group
+        4. Returns random movie from highest rating group (includes unrated movies)
         """
         # Get all movies from Plex
         all_movies = self.plex.get_all_movies()
@@ -166,11 +166,26 @@ class MovieSelector:
         if not rating_groups:
             return None, "No movies available"
 
-        # Get highest rating group
-        highest_rating = max(rating_groups.keys())
-        highest_group = rating_groups[highest_rating]
+        # Get highest rating group (excluding unrated if there are rated movies)
+        rated_groups = {k: v for k, v in rating_groups.items() if k > 0}
 
-        # Get random movie from highest rating group
+        if rated_groups:
+            # If we have rated movies, select from highest rated group
+            highest_rating = max(rated_groups.keys())
+            highest_group = rated_groups[highest_rating].copy()
+
+            # IMPORTANT: Include unrated movies (rating 0) with the highest rated group
+            # This ensures unrated movies are always considered for selection
+            if 0 in rating_groups:
+                highest_group.extend(rating_groups[0])
+        else:
+            # If only unrated movies exist, use them
+            highest_group = rating_groups.get(0, [])
+
+        if not highest_group:
+            return None, "No movies available"
+
+        # Get random movie from combined group
         selected_movie = self.get_random_movie(highest_group)
 
         return selected_movie, None

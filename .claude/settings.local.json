@@ -3,7 +3,12 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(docker build:*)",
-      "Bash(docker push:*)"
+      "Bash(docker push:*)",
+      "Bash(git push:*)",
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
